@@ -1,0 +1,24 @@
+{
+  "name": "deck",
+  "version": "1.0.0",
+  "description": "Agent Dashboard - TUI for monitoring tmux agent panes",
+  "main": "src/index.tsx",
+  "scripts": {
+    "dev": "tsx src/index.tsx",
+    "start": "tsx src/index.tsx"
+  },
+  "type": "module",
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "ink": "^7.0.3",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.6",
+    "strip-ansi": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
+}
