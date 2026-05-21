@@ -2,10 +2,19 @@
   "name": "@vitalyrudenko/deck",
   "version": "1.0.0",
   "description": "A deck for your widgets",
-  "main": "src/index.tsx",
+  "main": "dist/index.js",
+  "bin": {
+    "deck": "bin/deck.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
   "scripts": {
-    "dev": "tsx src/index.tsx",
-    "start": "tsx src/index.tsx"
+    "dev": "tsx src/app.tsx",
+    "start": "tsx src/app.tsx",
+    "build": "esbuild src/app.tsx --bundle --platform=node --format=esm --jsx=automatic --packages=external --outfile=dist/index.js",
+    "prepublishOnly": "npm run build"
   },
   "type": "module",
   "dependencies": {
@@ -18,6 +27,7 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
+    "esbuild": "^0.25.0",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3"
   }
