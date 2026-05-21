@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const { stdout } = useStdout()
   const [widgets, setWidgets] = useState<Widget[]>()
   const [width, setWidth] = useState(() => stdout.columns)
+  const [height, setHeight] = useState(() => stdout.rows)
 
   useEffect(() => {
     async function fetch() {
@@ -33,6 +34,7 @@ const App: React.FC = () => {
     stdout.on('resize', onResize)
     function onResize() {
       setWidth(stdout.columns)
+      setHeight(stdout.rows)
     }
 
     return () => {
@@ -44,9 +46,10 @@ const App: React.FC = () => {
   return (
     <Dashboard
       width={width}
+      height={height}
       widgets={widgets}
       // TODO: which provider?
-      view={async (widgetId, viewId) => providers[0].view(widgetId, viewId, 25)}
+      view={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
       onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
       onExit={() => exit()}
     />
@@ -55,11 +58,13 @@ const App: React.FC = () => {
 
 const Dashboard: React.FC<{
   width: number
+  height: number
+
   widgets: Widget[] | undefined
-  view: (widgetId: string, viewId: string) => Promise<string>
+  view: (widgetId: string, viewId: string, height: number) => Promise<string>
   onAction: (widgetId: string, actionId: string, text?: string) => Promise<void>
   onExit: () => void
-}> = ({ width, widgets, view: getView, onAction, onExit }) => {
+}> = ({ height, widgets, view: getView, onAction, onExit }) => {
   const [now, setNow] = useState(() => Date.now())
   const [index, setIndex] = useState(0)
   const [text, setText] = useState('')
@@ -69,6 +74,8 @@ const Dashboard: React.FC<{
   const [view, setView] = useState<string>()
 
   const widget = useMemo(() => widgets?.[index], [widgets, index])
+  const shouldShowTypes = useMemo(() => widgets?.some(w1 => widgets?.some(w2 => w1.type !== w2.type)), [widgets])
+  const shouldShowNames = useMemo(() => widgets?.some(w => w.name), [widgets])
 
   useEffect(() => {
     const intervalId = setInterval(() => setNow(Date.now()), 1000)
@@ -79,7 +86,7 @@ const Dashboard: React.FC<{
     if (!viewId) return
 
     async function fetch() {
-      setView(await getView(widget!.id, viewId!))
+      setView(await getView(widget!.id, viewId!, height))
     }
 
     const intervalId = setInterval(fetch, 1000)
@@ -99,7 +106,9 @@ const Dashboard: React.FC<{
 
     if (textActionId) {
       if (key.return) {
-        onAction(widget.id, textActionId, text)
+        if (text) {
+          onAction(widget.id, textActionId, text)
+        }
 
         setTextActionId(undefined)
         setText('')
@@ -174,13 +183,12 @@ const Dashboard: React.FC<{
   if (viewId) {
     return (
       <Box flexDirection="column">
-        <Text>
-          {' '}
-          {widget.name}: {widget.views!.find(v => v.id === viewId)!.name}
-        </Text>
-        <Text>{'─'.repeat(Math.min(width - 2, 500))}</Text>
-
-        {!!view && view.split('\n').map((line, i) => <Text key={i}>{line}</Text>)}
+        {!!view &&
+          view.split('\n').map((line, i) => (
+            <Text key={i} wrap="truncate-end">
+              {line}
+            </Text>
+          ))}
         {!view && <Text>Loading view...</Text>}
       </Box>
     )
@@ -189,30 +197,33 @@ const Dashboard: React.FC<{
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box>
-        <Box flexDirection="column">
+        <Box flexDirection="column" flexShrink={0} maxWidth={40}>
           <Text dimColor wrap="truncate">
             {'  '}Directory
           </Text>
           {widgets.map((widget, j) => (
-            <Text key={widget.id} wrap="truncate-end">
+            <Text key={widget.id} wrap="truncate-middle">
               {j === index ? '› ' : '  '}
               {collapseHomedir(widget.cwd)}
             </Text>
           ))}
         </Box>
-        <Box flexDirection="column">
-          <Text dimColor wrap="truncate-end">
-            {' '}
-            │ Name
-          </Text>
-          {widgets.map(widget => (
-            <Text key={widget.id} wrap="truncate-end">
+        {(shouldShowNames || shouldShowTypes) && (
+          <Box flexDirection="column" flexShrink={0} maxWidth={30}>
+            <Text dimColor wrap="truncate-end">
               {' '}
-              │ {widget.name}
+              │ Name
             </Text>
-          ))}
-        </Box>
-        <Box flexDirection="column">
+            {widgets.map(widget => (
+              <Text key={widget.id} wrap="truncate-end">
+                {' '}
+                │ {shouldShowTypes ? (shouldShowNames ? `${widget.type}: ` : widget.type) : ''}
+                {widget.name}
+              </Text>
+            ))}
+          </Box>
+        )}
+        <Box flexDirection="column" flexShrink={0}>
           <Text dimColor wrap="truncate-end">
             {' '}
             │ Status
@@ -220,23 +231,11 @@ const Dashboard: React.FC<{
           {widgets.map(widget => (
             <Text key={widget.id} wrap="truncate-end">
               {' '}
-              │ {widget.status}
+              │ {widget.status}, {formatTimeAgo(widget.lastUpdatedAt.getTime(), now)}
             </Text>
           ))}
         </Box>
-        <Box flexDirection="column">
-          <Text dimColor wrap="truncate-end">
-            {' '}
-            │ Updated
-          </Text>
-          {widgets.map(widget => (
-            <Text key={widget.id} wrap="truncate-end">
-              {' '}
-              │ {formatTimeAgo(widget.lastUpdatedAt.getTime(), now)}
-            </Text>
-          ))}
-        </Box>
-        <Box flexDirection="column">
+        <Box flexDirection="column" flexShrink={1}>
           <Text dimColor wrap="truncate-end">
             {' '}
             │ Preview
@@ -257,12 +256,15 @@ const Dashboard: React.FC<{
           </Box>
         )}
 
-        {!!textActionId && (
+        {!!textActionId && <Box flexDirection='column'>
           <Box>
             <Text>{'› '}</Text>
             <TextInput value={text} onChange={setText} />
           </Box>
-        )}
+          <Box marginLeft={2}>
+            <Text>enter to submit · escape to cancel</Text>
+          </Box>
+        </Box>}
 
         {!textActionId && !confirmActionId && (
           <Box flexDirection="column" marginLeft={2}>

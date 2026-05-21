@@ -7,19 +7,13 @@ import type { Widget } from './widget'
 const execAsync = promisify(exec)
 
 export class TmuxProvider implements Provider {
-  #paneIds = new Map<
-    string,
-    {
-      lastSignature: string
-      lastUpdatedAt: Date
-    }
-  >()
+  #paneIds = new Map<string, { lastSignature: string; lastUpdatedAt: Date }>()
 
   async poll(): Promise<Widget[]> {
     const listPanesOutput = await execAsync(
       `tmux list-panes -s \
          -t home \
-         -F '#{pane_id};;;#{pane_current_path};;;#{pane_pid}'`,
+         -F '#{pane_id};;;#{pane_current_path};;;#{pane_pid};;;#{pane_title}'`,
       { encoding: 'utf-8' },
     )
 
@@ -29,13 +23,18 @@ export class TmuxProvider implements Provider {
       .filter(Boolean)
       .map(line => {
         const parts = line.split(';;;')
-        return { paneId: parts[0], cwd: parts[1], pid: Number(parts[2]) }
+        return {
+          paneId: parts[0],
+          cwd: parts[1],
+          pid: Number(parts[2]),
+          title: parts[3],
+        }
       })
 
     const widgets: Widget[] = []
 
     for (const pane of panes) {
-      const query = await queryPane(pane.pid, pane.paneId)
+      const query = await queryPane(pane.pid, pane.paneId, pane.title)
       if (!query) continue
 
       // TODO: refactor
@@ -54,6 +53,7 @@ export class TmuxProvider implements Provider {
       widgets.push({
         id: pane.paneId,
         name: query.name,
+        type: query.type,
         cwd: pane.cwd,
         status: query.status,
         preview: query.preview,
@@ -63,23 +63,26 @@ export class TmuxProvider implements Provider {
           { id: 'focus', name: 'Focus', keymaps: ['Enter'] },
           { id: 'prompt', name: 'Prompt', keymaps: [' ', 'm'], text: true },
           ...(query.status === 'busy' ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }] : []),
-          // TODO: Allow/deny permissions
+          ...(query.status === 'blocked' ? [{ id: 'submit', name: 'Submit', keymaps: ['s'] }] : []),
         ],
         // TODO: Current permission state + Shift+Tab emulation
       })
     }
 
+    // Stable sort
+    widgets.sort((a, b) => a.id.localeCompare(b.id))
+
     return widgets
   }
 
-  async view(widgetId: string, viewId: string, lines: number): Promise<string> {
+  async view(widgetId: string, viewId: string, height: number): Promise<string> {
     if (viewId !== 'primary') {
       throw new Error(`Unknown view: ${viewId}`)
     }
 
-    const capturePaneOutput = await execAsync(`tmux capture-pane -t ${widgetId} -S -${lines} -J -p`)
+    const capturePaneOutput = await execAsync(`tmux capture-pane -t ${widgetId} -S -${height} -J -p`)
     const stdout = capturePaneOutput.stdout.trim()
-    return stdout.split('\n').slice(-lines).join('\n')
+    return stdout.split('\n').slice(-height).join('\n')
   }
 
   async action(widgetId: string, actionId: string, text?: string): Promise<void> {
@@ -98,11 +101,15 @@ export class TmuxProvider implements Provider {
       await execAsync(`tmux send-keys -t ${widgetId} "${text.replaceAll(/"/g, '\\"')}" Enter`)
     } else if (actionId === 'interrupt') {
       await execAsync(`tmux send-keys -t ${widgetId} Escape`)
+    } else if (actionId === 'submit') {
+      await execAsync(`tmux send-keys -t ${widgetId} Enter`)
+    } else {
+      throw new Error(`Unknown action: ${actionId}`)
     }
   }
 }
 
-async function queryPane(pid: number, paneId: string) {
+async function queryPane(pid: number, paneId: string, paneTitle: string) {
   const psOutput = await execAsync('ps -eo pid,ppid,command', { encoding: 'utf8' })
 
   const processes = new Map<number, { parentPid: number; command: string }>()
@@ -134,14 +141,53 @@ async function queryPane(pid: number, paneId: string) {
 
   if (!type) return undefined
 
-  const capturePaneOutput = await execAsync(`tmux capture-pane -t ${paneId} -S -50 -J -p`)
+  const capturePaneOutput = await execAsync(`tmux capture-pane -t ${paneId} -S 0 -J -p`)
   const stdout = capturePaneOutput.stdout.trim()
-
-  const preview = stdout.split('\n')[0] // TODO: proper preview
+  const lines = stdout.split('\n')
 
   if (type === 'pi') {
+    // TODO: Refactor & optimize
+    let preview = ''
+    if (stdout.includes('Allow') && stdout.includes('enter select')) {
+      preview = lines.find(line => line.includes('Allow'))!
+    } else if (stdout.includes('Working...')) {
+      const linesBeforeWorking = lines.slice(
+        0,
+        lines.findIndex(line => line.includes('Working...')),
+      )
+
+      preview = linesBeforeWorking.slice(-5).join(' ').trim()
+    } else {
+      let block: string[] = []
+      for (let i = 0; i < lines.length; i++) {
+        const previousLine = lines[i - 1]?.trim()
+        const line = lines[i].trim()
+
+        // Prompt line starts, can stop querying
+        if (line.includes('────────────────────')) {
+          break
+        }
+
+        if (line) {
+          if (stdout.includes('Thinking...')) {
+            if (line === 'Thinking...') {
+              block = []
+              continue
+            }
+          } else if (!previousLine) {
+            block = []
+          }
+
+          block.push(line)
+        }
+      }
+
+      preview = block.join(' ')
+    }
+
     return {
-      name: 'Pi',
+      // NOTE: pi doesn't set auto-title
+      type: 'pi',
       signature: stdout,
       preview,
       status:
@@ -152,8 +198,46 @@ async function queryPane(pid: number, paneId: string) {
             : 'idle',
     } as const
   } else if (type === 'claude_code') {
+    // TODO: Refactor & optimize
+    let preview = ''
+    if (stdout.includes('Do you want to') && stdout.includes('1. Yes') && stdout.includes('Esc to cancel')) {
+      preview = lines.find(line => line.includes('Do you want to'))!
+    } else {
+      let blocks: string[][] = [[]]
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim()
+
+        // Prompt line starts, can stop querying
+        if (line.includes('────────────────────')) {
+          break
+        }
+
+        if (line) {
+          if (line.startsWith('⏺ ') || line.startsWith('❯ ')) {
+            blocks.push([])
+          }
+
+          blocks[blocks.length - 1].push(line)
+        }
+      }
+
+      const blockEndIndex = blocks[blocks.length - 1].findIndex(
+        line =>
+          // Churned for 5s
+          /^. [A-Z][a-z ]+ for [\d sm]+$/.test(line) ||
+          // Simulating productivity… (5s)
+          line.includes('… ('),
+      )
+      if (blockEndIndex !== -1) {
+        blocks[blocks.length - 1] = blocks[blocks.length - 1].slice(0, blockEndIndex)
+      }
+
+      preview = blocks[blocks.length - 1].join(' ')
+    }
+
     return {
-      name: 'Claude',
+      name: paneTitle.replace('✳ ', ''),
+      type: 'claude_code',
       signature: stdout,
       preview,
       status:
