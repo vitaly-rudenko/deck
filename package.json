@@ -1,7 +1,7 @@
 {
-  "name": "deck",
+  "name": "@vitalyrudenko/deck",
   "version": "1.0.0",
-  "description": "Agent Dashboard - TUI for monitoring tmux agent panes",
+  "description": "A deck for your widgets",
   "main": "src/index.tsx",
   "scripts": {
     "dev": "tsx src/index.tsx",
