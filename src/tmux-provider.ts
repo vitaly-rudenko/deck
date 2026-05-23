@@ -7,7 +7,12 @@ import type { Widget } from './widget'
 const execAsync = promisify(exec)
 
 export class TmuxProvider implements Provider {
+  #options
   #paneIds = new Map<string, { lastSignature: string; lastUpdatedAt: Date }>()
+
+  constructor(options: { terminalAppName: string }) {
+    this.#options = options
+  }
 
   async poll(): Promise<Widget[]> {
     const listPanesOutput = await execAsync(
@@ -92,6 +97,15 @@ export class TmuxProvider implements Provider {
 
       await execAsync(`tmux select-window -t ${windowIndex}`)
       await execAsync(`tmux select-pane -t ${widgetId}`)
+
+      try {
+        const terminalAppName = this.#options.terminalAppName
+        if (terminalAppName) {
+          await execAsync(`osascript -e 'tell application "${terminalAppName}" to activate'`)
+        }
+      } catch {
+        // Ignore if not on macOS or terminal app isn't running
+      }
     } else if (actionId === 'prompt') {
       if (!text) {
         throw new Error('No text provided')
