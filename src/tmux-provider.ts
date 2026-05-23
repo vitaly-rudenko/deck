@@ -8,7 +8,7 @@ const execAsync = promisify(exec)
 
 export class TmuxProvider implements Provider {
   #options
-  #paneIds = new Map<string, { lastSignature: string; lastUpdatedAt: Date }>()
+  #paneIds = new Map<string, { lastSignature: string; lastUpdatedAt?: Date }>()
 
   constructor(options: { terminalAppName?: string }) {
     this.#options = options
@@ -47,7 +47,7 @@ export class TmuxProvider implements Provider {
       if (!existingPane) {
         existingPane = {
           lastSignature: query.signature,
-          lastUpdatedAt: new Date(),
+          lastUpdatedAt: undefined,
         }
 
         this.#paneIds.set(pane.paneId, existingPane)

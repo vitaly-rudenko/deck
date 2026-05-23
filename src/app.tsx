@@ -122,7 +122,7 @@ const SwiftbarMenubarComponent: React.FC<{
           id: '_',
           title:
             (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
-            ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt.getTime(), Date.now())}]`,
+            ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
           children: [
             { id: '_', title: widget.preview.length > 40 ? widget.preview.slice(0, 40) + '…' : widget.preview },
             { id: '_', title: '', separator: true },
@@ -318,7 +318,7 @@ const Dashboard: React.FC<{
           {widgets.map(widget => (
             <Text key={widget.id} wrap="truncate-end">
               {' '}
-              │ {widget.status}, {formatTimeAgo(widget.lastUpdatedAt.getTime(), now)}
+              │ {widget.status}, {formatTimeAgo(widget.lastUpdatedAt?.getTime(), now)}
             </Text>
           ))}
         </Box>

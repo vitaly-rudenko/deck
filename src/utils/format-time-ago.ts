@@ -1,4 +1,8 @@
-export function formatTimeAgo(timestamp: number, now: number): string {
+export function formatTimeAgo(timestamp: number | undefined, now: number): string {
+  if (!timestamp) {
+    return 'unknown'
+  }
+
   const diffMs = now - timestamp
   const diffSec = Math.floor(diffMs / 1000)
 
