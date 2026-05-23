@@ -7,8 +7,14 @@ import { formatTimeAgo } from './utils/format-time-ago.ts'
 import { TmuxProvider } from './tmux-provider.ts'
 import type { Widget } from './widget.ts'
 import type { Provider } from './provider.ts'
+import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
 
-const providers: Provider[] = [new TmuxProvider()]
+const terminalAppName = process.env.DECK_TERMINAL_APP_NAME!
+
+const swiftbarPluginsDir = process.env.DECK_SWIFTBAR_PLUGINS_DIR
+const port = process.env.DECK_SWIFTBAR_PORT ? parseInt(process.env.DECK_SWIFTBAR_PORT, 10) : undefined
+
+const providers: Provider[] = [new TmuxProvider({ terminalAppName })]
 
 const App: React.FC = () => {
   const { exit } = useApp()
@@ -44,16 +50,97 @@ const App: React.FC = () => {
   }, [])
 
   return (
-    <Dashboard
-      width={width}
-      height={height}
-      widgets={widgets}
-      // TODO: which provider?
-      view={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
-      onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
-      onExit={() => exit()}
-    />
+    <>
+      <Dashboard
+        width={width}
+        height={height}
+        widgets={widgets}
+        // TODO: which provider?
+        view={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
+        onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
+        onExit={() => exit()}
+      />
+
+      {!!swiftbarPluginsDir && port !== undefined && (
+        <SwiftbarMenubarComponent
+          swiftbarPluginsDir={swiftbarPluginsDir}
+          port={port}
+          widgets={widgets}
+          onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
+        />
+      )}
+    </>
   )
+}
+
+const SwiftbarMenubarComponent: React.FC<{
+  swiftbarPluginsDir: string
+  port: number
+  widgets: Widget[] | undefined
+  onAction: (widgetId: string, actionId: string, text?: string) => Promise<void>
+}> = ({ swiftbarPluginsDir, port, widgets, onAction }) => {
+  const [menubar, setMenubar] = useState<SwiftbarMenubar>()
+
+  useEffect(() => {
+    const menubar = new SwiftbarMenubar({ swiftbarPluginsDir, port, defaultIcon: '⚫️' })
+
+    menubar.on('click', ({ id }) => {
+      const [widgetId, actionId] = id.split(';;;')
+      if (!actionId) return
+
+      onAction(widgetId, actionId)
+    })
+
+    menubar.on('failure', ({ message }) => {
+      console.error('SwiftbarMenubar failure:', message)
+    })
+
+    setMenubar(menubar)
+
+    return () => {
+      setMenubar(undefined)
+      menubar.dispose()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!menubar) return
+
+    async function update() {
+      if (!widgets) {
+        await menubar!.update({ icon: '🔵', children: [{ id: '_', title: 'No widgets yet' }] })
+        return
+      }
+
+      await menubar!.update({
+        icon: widgets.some(widget => widget.status === 'blocked') //
+          ? '🔴'
+          : widgets.some(widget => widget.status === 'busy')
+            ? '🟢'
+            : '⚪️',
+        children: widgets.map(widget => ({
+          id: '_',
+          title:
+            (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
+            ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt.getTime(), Date.now())}]`,
+          children: [
+            { id: '_', title: widget.preview.length > 40 ? widget.preview.slice(0, 40) + '…' : widget.preview },
+            { id: '_', title: '', separator: true },
+            ...(widget.actions
+              ?.filter(action => !action.text)
+              .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })) ?? []),
+          ],
+        })),
+      })
+    }
+
+    const intervalId = setInterval(update, 1000)
+    update()
+
+    return () => clearInterval(intervalId)
+  }, [menubar, widgets])
+
+  return null
 }
 
 const Dashboard: React.FC<{
@@ -256,15 +343,17 @@ const Dashboard: React.FC<{
           </Box>
         )}
 
-        {!!textActionId && <Box flexDirection='column'>
-          <Box>
-            <Text>{'› '}</Text>
-            <TextInput value={text} onChange={setText} />
+        {!!textActionId && (
+          <Box flexDirection="column">
+            <Box>
+              <Text>{'› '}</Text>
+              <TextInput value={text} onChange={setText} />
+            </Box>
+            <Box marginLeft={2}>
+              <Text>enter to submit · escape to cancel</Text>
+            </Box>
           </Box>
-          <Box marginLeft={2}>
-            <Text>enter to submit · escape to cancel</Text>
-          </Box>
-        </Box>}
+        )}
 
         {!textActionId && !confirmActionId && (
           <Box flexDirection="column" marginLeft={2}>
