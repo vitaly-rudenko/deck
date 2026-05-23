@@ -9,7 +9,7 @@ import type { Widget } from './widget.ts'
 import type { Provider } from './provider.ts'
 import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
 
-const terminalAppName = process.env.DECK_TERMINAL_APP_NAME!
+const terminalAppName = process.env.DECK_TERMINAL_APP_NAME
 
 const swiftbarPluginsDir = process.env.DECK_SWIFTBAR_PLUGINS_DIR
 const port = process.env.DECK_SWIFTBAR_PORT ? parseInt(process.env.DECK_SWIFTBAR_PORT, 10) : undefined
