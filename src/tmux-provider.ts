@@ -68,7 +68,8 @@ export class TmuxProvider implements Provider {
           { id: 'focus', name: 'Focus', keymaps: ['Enter'] },
           { id: 'prompt', name: 'Prompt', keymaps: [' ', 'm'], text: true },
           ...(query.status === 'busy' ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }] : []),
-          ...(query.status === 'blocked' ? [{ id: 'submit', name: 'Submit', keymaps: ['s'] }] : []),
+          ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
+          ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
         ],
         // TODO: Current permission state + Shift+Tab emulation
       })
@@ -113,9 +114,9 @@ export class TmuxProvider implements Provider {
 
       // TODO: Steering / follow-up
       await execAsync(`tmux send-keys -t ${widgetId} "${text.replaceAll(/"/g, '\\"')}" Enter`)
-    } else if (actionId === 'interrupt') {
+    } else if (actionId === 'interrupt' || actionId === 'deny') {
       await execAsync(`tmux send-keys -t ${widgetId} Escape`)
-    } else if (actionId === 'submit') {
+    } else if (actionId === 'allow') {
       await execAsync(`tmux send-keys -t ${widgetId} Enter`)
     } else {
       throw new Error(`Unknown action: ${actionId}`)
@@ -156,8 +157,8 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
   if (!type) return undefined
 
   const capturePaneOutput = await execAsync(`tmux capture-pane -t ${paneId} -S 0 -J -p`)
-  const stdout = capturePaneOutput.stdout.trim()
-  const lines = stdout.split('\n')
+  const stdout = capturePaneOutput.stdout
+  const lines = stdout.split('\n').map(line => line.trim())
 
   if (type === 'pi') {
     // TODO: Refactor & optimize
@@ -165,17 +166,18 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
     if (stdout.includes('Allow') && stdout.includes('enter select')) {
       preview = lines.find(line => line.includes('Allow'))!
     } else if (stdout.includes('Working...')) {
-      const linesBeforeWorking = lines.slice(
-        0,
-        lines.findIndex(line => line.includes('Working...')),
-      )
+      const linesBeforeWorking = lines
+        .slice(
+          0,
+          lines.findIndex(line => line.includes('Working...')),
+        )
 
-      preview = linesBeforeWorking.slice(-5).join(' ').trim()
+      preview = linesBeforeWorking.slice(-5).join(' ')
     } else {
       let block: string[] = []
       for (let i = 0; i < lines.length; i++) {
-        const previousLine = lines[i - 1]?.trim()
-        const line = lines[i].trim()
+        const previousLine = lines[i - 1]
+        const line = lines[i]
 
         // Prompt line starts, can stop querying
         if (line.includes('────────────────────')) {
@@ -219,7 +221,7 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
     } else {
       let blocks: string[][] = [[]]
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim()
+        const line = lines[i]
 
         // Prompt line starts, can stop querying
         if (line.includes('────────────────────')) {
