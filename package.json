@@ -11,8 +11,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "tsx src/app.tsx",
-    "start": "tsx src/app.tsx",
+    "start": "tsx --env-file=.env src/app.tsx",
     "build": "esbuild src/app.tsx --bundle --platform=node --format=esm --jsx=automatic --packages=external --outfile=dist/index.js",
     "prepublishOnly": "npm run build"
   },
