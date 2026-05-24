@@ -262,7 +262,9 @@ const Dashboard: React.FC<{
     }
 
     if (viewId) {
-      if (input === 'q' || input === '?' || key.escape) {
+      const view = widget.views?.find(view => view.id === viewId)
+
+      if (!view || input === 'q' || view.keymaps.some(keymap => matchKeymap(keymap, input, key)) || key.escape) {
         setViewId(undefined)
         setView(undefined)
       }
