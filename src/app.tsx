@@ -267,6 +267,15 @@ const Dashboard: React.FC<{
       setIndex(i => (i === widgets.length - 1 ? 0 : i + 1))
     } else if (input === 'q' || key.escape) {
       onExit()
+    } else if (/^[1-9]$/.test(input)) {
+      const targetIndex = Number(input) - 1
+      if (targetIndex < widgets.length) {
+        setIndex(targetIndex)
+
+        const targetWidget = widgets[targetIndex]
+        const action = targetWidget.actions?.find(a => a.default)
+        if (action) handleAction(targetWidget, action)
+      }
     } else {
       const view = widget.views?.find(v => v.keymaps.some(k => matchKeymap(k, input, key)))
       if (view) handleView(widget, view)
@@ -309,13 +318,25 @@ const Dashboard: React.FC<{
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box>
-        <Box flexDirection="column" flexShrink={0} maxWidth={40}>
+        <Box flexDirection="column" flexShrink={0} maxWidth={4}>
           <Text dimColor wrap="truncate">
-            {'  '}Directory
+            {'  '}#
           </Text>
           {widgets.map((widget, j) => (
             <Text key={widget.id} wrap="truncate-middle">
               {j === index ? '› ' : '  '}
+              {j + 1}
+            </Text>
+          ))}
+        </Box>
+        <Box flexDirection="column" flexShrink={0} maxWidth={40}>
+          <Text dimColor wrap="truncate">
+            {' '}
+            Directory
+          </Text>
+          {widgets.map((widget, j) => (
+            <Text key={widget.id} wrap="truncate-middle">
+              {' '}
               {collapseHomedir(widget.cwd)}
             </Text>
           ))}
