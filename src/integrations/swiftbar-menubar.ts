@@ -106,16 +106,13 @@ export class SwiftbarMenubar {
     }
 
     const title = indent + item.title
+    const url = `http://127.0.0.1:${this.#options.port}/click/${encodeURIComponent(item.id)}`
+    lines.push(`${title} | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${url} terminal=false`)
 
     if (item.children && item.children.length > 0) {
-      lines.push(title)
-
       for (const child of item.children) {
         this.#renderInto(lines, child, indent + '--')
       }
-    } else {
-      const url = `http://127.0.0.1:${this.#options.port}/click/${encodeURIComponent(item.id)}`
-      lines.push(`${title} | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${url} terminal=false`)
     }
   }
 
