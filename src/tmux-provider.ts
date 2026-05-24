@@ -274,7 +274,6 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
     } as const
   } else if (type === 'self') {
     return {
-      name: 'Deck',
       type: 'self',
       status: 'idle',
     } as const
