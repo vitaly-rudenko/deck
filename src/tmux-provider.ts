@@ -67,7 +67,7 @@ export class TmuxProvider implements Provider {
         actions: [
           { id: 'focus', name: 'Focus', keymaps: ['Enter'], default: true },
           { id: 'prompt', name: 'Prompt', keymaps: [' ', 'm'], text: true },
-          ...(query.status === 'busy' ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }] : []),
+          ...(query.status === 'working' ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }] : []),
           ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
           ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
         ],
@@ -210,7 +210,7 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
         stdout.includes('Allow') && stdout.includes('enter select') //
           ? 'blocked'
           : stdout.includes('Working...')
-            ? 'busy'
+            ? 'working'
             : 'idle',
     } as const
   } else if (type === 'claude_code') {
@@ -260,7 +260,7 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
         stdout.includes('Do you want to') && stdout.includes('1. Yes') && stdout.includes('Esc to cancel') //
           ? 'blocked'
           : stdout.includes('… (')
-            ? 'busy'
+            ? 'working'
             : 'idle',
     } as const
   } else {

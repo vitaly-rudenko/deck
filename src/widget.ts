@@ -3,7 +3,7 @@ export type Widget = {
   name?: string
   type: string
   cwd: string
-  status: 'idle' | 'busy' | 'blocked'
+  status: 'idle' | 'working' | 'blocked'
   lastUpdatedAt?: Date
   preview: string
 

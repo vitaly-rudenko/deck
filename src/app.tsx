@@ -115,7 +115,7 @@ const SwiftbarMenubarComponent: React.FC<{
       await menubar!.update({
         icon: widgets.some(widget => widget.status === 'blocked') //
           ? '🔴'
-          : widgets.some(widget => widget.status === 'busy')
+          : widgets.some(widget => widget.status === 'working')
             ? '🟢'
             : '⚪️',
         children: widgets.map(widget => {
