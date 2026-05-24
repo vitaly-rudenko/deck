@@ -1,5 +1,5 @@
 import TextInput from 'ink-text-input'
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { render, Box, Text, useApp, useInput, Key, useStdout } from 'ink'
 
 import { collapseHomedir } from './utils/collapse-homedir.ts'
@@ -15,6 +15,16 @@ const port = process.env.DECK_SWIFTBAR_PORT ? Number(process.env.DECK_SWIFTBAR_P
 const shortcut = process.env.DECK_SHORTCUT
 
 const providers: Provider[] = [new TmuxProvider({ terminalAppName, shortcut })]
+
+const typeLabelMap: Record<string, string> = {
+  pi: 'Pi',
+  claude_code: 'Claude',
+}
+
+function getWidgetName(widget: Widget) {
+  const type = typeLabelMap[widget.type] ?? widget.type
+  return widget.name ? `${type}: ${widget.name}` : type
+}
 
 const App: React.FC = () => {
   const { exit } = useApp()
@@ -171,8 +181,24 @@ const Dashboard: React.FC<{
   const [view, setView] = useState<string>()
 
   const widget = useMemo(() => widgets?.[index], [widgets, index])
-  const shouldShowTypes = useMemo(() => widgets?.some(w1 => widgets?.some(w2 => w1.type !== w2.type)), [widgets])
-  const shouldShowNames = useMemo(() => widgets?.some(w => w.name), [widgets])
+  const shouldShowNames = useMemo(
+    () => widgets?.some(w1 => w1.name || widgets?.some(w2 => w1.type !== w2.type)),
+    [widgets],
+  )
+
+  const handleAction = useCallback((widget: Widget, action: NonNullable<Widget['actions']>[number]) => {
+    if (action.text) {
+      setTextActionId(action.id)
+    } else if (action.confirm) {
+      setConfirmActionId(action.id)
+    } else {
+      onAction(widget.id, action.id)
+    }
+  }, [])
+
+  const handleView = useCallback((_widget: Widget, view: NonNullable<Widget['views']>[number]) => {
+    setViewId(view.id)
+  }, [])
 
   useEffect(() => {
     const intervalId = setInterval(() => setNow(Date.now()), 1000)
@@ -243,21 +269,10 @@ const Dashboard: React.FC<{
       onExit()
     } else {
       const view = widget.views?.find(v => v.keymaps.some(k => matchKeymap(k, input, key)))
-      if (view) {
-        setViewId(view.id)
-        return
-      }
+      if (view) handleView(widget, view)
 
       const action = widget.actions?.find(a => a.keymaps.some(k => matchKeymap(k, input, key)))
-      if (action) {
-        if (action.text) {
-          setTextActionId(action.id)
-        } else if (action.confirm) {
-          setConfirmActionId(action.id)
-        } else {
-          onAction(widget.id, action.id)
-        }
-      }
+      if (action) handleAction(widget, action)
     }
   })
 
@@ -305,7 +320,7 @@ const Dashboard: React.FC<{
             </Text>
           ))}
         </Box>
-        {(shouldShowNames || shouldShowTypes) && (
+        {shouldShowNames && (
           <Box flexDirection="column" flexShrink={0} maxWidth={30}>
             <Text dimColor wrap="truncate-end">
               {' '}
@@ -314,7 +329,7 @@ const Dashboard: React.FC<{
             {widgets.map(widget => (
               <Text key={widget.id} wrap="truncate-end">
                 {' '}
-                │ {shouldShowTypes ? (shouldShowNames ? `${widget.type}: ` : widget.type) : ''}
+                │ {shouldShowNames ? getWidgetName(widget) : ''}
                 {widget.name}
               </Text>
             ))}
@@ -338,7 +353,7 @@ const Dashboard: React.FC<{
             │ Preview
           </Text>
           {widgets.map(widget => (
-            <Text key={widget.id} wrap="truncate-end">
+            <Text key={widget.id} wrap="truncate-end" italic>
               {' '}
               │ {widget.preview?.trim() ?? 'No preview'}
             </Text>
@@ -349,7 +364,7 @@ const Dashboard: React.FC<{
       <Box marginTop={1}>
         {!!confirmActionId && (
           <Box marginLeft={2}>
-            <Text>Confirm? y/n</Text>
+            <Text>Confirm? (y/n)</Text>
           </Box>
         )}
 
