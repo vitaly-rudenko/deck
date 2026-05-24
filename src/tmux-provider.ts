@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 
 import type { Provider } from './provider'
 import type { Widget } from './widget'
+import { setTimeout as setTimeoutAsync } from 'node:timers/promises'
 
 const execAsync = promisify(exec)
 
@@ -28,18 +29,13 @@ export class TmuxProvider implements Provider {
       .filter(Boolean)
       .map(line => {
         const parts = line.split(';;;')
-        return {
-          paneId: parts[0],
-          cwd: parts[1],
-          pid: Number(parts[2]),
-          title: parts[3],
-        }
+        return { paneId: parts[0], cwd: parts[1], pid: Number(parts[2]) }
       })
 
     const widgets: Widget[] = []
 
     for (const pane of panes) {
-      const query = await queryPane(pane.pid, pane.paneId, pane.title)
+      const query = await queryPane(pane.pid, pane.paneId)
       if (!query) continue
 
       // TODO: refactor
@@ -57,7 +53,6 @@ export class TmuxProvider implements Provider {
 
       widgets.push({
         id: pane.paneId,
-        name: query.name,
         type: query.type,
         cwd: pane.cwd,
         status: query.status,
@@ -90,7 +85,7 @@ export class TmuxProvider implements Provider {
       throw new Error(`Unknown view: ${viewId}`)
     }
 
-    const capturePaneOutput = await execAsync(`tmux capture-pane -t ${widgetId} -S -${height} -J -p`)
+    const capturePaneOutput = await execAsync(`tmux capture-pane -t ${widgetId} -S -${height} -J -p -e`)
     const stdout = capturePaneOutput.stdout.trim()
     return stdout.split('\n').slice(-height).join('\n')
   }
@@ -101,6 +96,7 @@ export class TmuxProvider implements Provider {
       const windowIndex = Number(displayMessageOutput.stdout.trim())
 
       await execAsync(`tmux select-window -t ${windowIndex}`)
+      await setTimeoutAsync(100)
       await execAsync(`tmux select-pane -t ${widgetId}`)
 
       try {
@@ -132,7 +128,7 @@ export class TmuxProvider implements Provider {
   }
 }
 
-async function queryPane(pid: number, paneId: string, paneTitle: string) {
+async function queryPane(pid: number, paneId: string) {
   const psOutput = await execAsync('ps -eo pid,ppid,command', { encoding: 'utf8' })
 
   const processes = new Map<number, { parentPid: number; command: string }>()
@@ -140,14 +136,13 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
     const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/)
     if (match) {
       const [, pid, parentPid, command] = match
-      processes.set(+pid, { parentPid: +parentPid, command })
+      processes.set(Number(pid), { parentPid: Number(parentPid), command })
     }
   }
 
   let type: 'pi' | 'claude_code' | 'self' | undefined
 
   const selfPid = process.pid
-
   const queue = [pid]
   while (queue.length > 0) {
     const currentPid = queue.shift()
@@ -262,7 +257,6 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
     }
 
     return {
-      name: paneTitle.replace('✳ ', ''),
       type: 'claude_code',
       signature: stdout,
       preview,
