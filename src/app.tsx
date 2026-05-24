@@ -138,17 +138,10 @@ const SwiftbarMenubarComponent: React.FC<{
               (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
               ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
             shortcut: widget.shortcut,
-            children: [
-              ...(widget.preview
-                ? [
-                    { id, title: widget.preview.length > 40 ? widget.preview.slice(0, 40) + '…' : widget.preview },
-                    ...(widget.actions && widget.actions.length > 0 ? [{ id, title: '', separator: true }] : []),
-                  ]
-                : []),
-              ...(widget.actions
+            children:
+              widget.actions
                 ?.filter(action => !action.text)
-                .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })) ?? []),
-            ],
+                .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })) ?? [],
           }
         }),
       })
