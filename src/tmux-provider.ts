@@ -65,7 +65,7 @@ export class TmuxProvider implements Provider {
         lastUpdatedAt: existingPane.lastUpdatedAt,
         views: [{ id: 'primary', name: 'Primary', keymaps: ['?'] }],
         actions: [
-          { id: 'focus', name: 'Focus', keymaps: ['Enter'] },
+          { id: 'focus', name: 'Focus', keymaps: ['Enter'], default: true },
           { id: 'prompt', name: 'Prompt', keymaps: [' ', 'm'], text: true },
           ...(query.status === 'busy' ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }] : []),
           ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),

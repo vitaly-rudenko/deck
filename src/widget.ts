@@ -15,6 +15,7 @@ export type Widget = {
 
   actions?: {
     id: string
+    default?: boolean
     name: string
     keymaps: string[]
     text?: boolean

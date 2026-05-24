@@ -118,19 +118,24 @@ const SwiftbarMenubarComponent: React.FC<{
           : widgets.some(widget => widget.status === 'busy')
             ? '🟢'
             : '⚪️',
-        children: widgets.map(widget => ({
-          id: '_',
-          title:
-            (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
-            ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
-          children: [
-            { id: '_', title: widget.preview.length > 40 ? widget.preview.slice(0, 40) + '…' : widget.preview },
-            { id: '_', title: '', separator: true },
-            ...(widget.actions
-              ?.filter(action => !action.text)
-              .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })) ?? []),
-          ],
-        })),
+        children: widgets.map(widget => {
+          const defaultAction = widget.actions?.find(action => action.default)
+          const id = defaultAction ? [widget.id, defaultAction.id].join(';;;') : '_'
+
+          return {
+            id,
+            title:
+              (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
+              ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
+            children: [
+              { id, title: widget.preview.length > 40 ? widget.preview.slice(0, 40) + '…' : widget.preview },
+              ...(widget.actions && widget.actions.length > 0 ? [{ id, title: '', separator: true }] : []),
+              ...(widget.actions
+                ?.filter(action => !action.text)
+                .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })) ?? []),
+            ],
+          }
+        }),
       })
     }
 
