@@ -16,6 +16,8 @@ type SwiftbarMenubarEvent =
   | { type: 'click'; data: { id: string } } //
   | { type: 'failure'; data: { message: string } }
 
+// TODO: Escape "title" properly
+
 export class SwiftbarMenubar {
   #emitter = new EventEmitter()
   #options
@@ -23,6 +25,7 @@ export class SwiftbarMenubar {
   #startPromise: Promise<void> | undefined
   #server: Server | undefined
 
+  #itemIds: string[] = []
   #items: MenuItem[] = []
   #icon: string
 
@@ -63,15 +66,22 @@ export class SwiftbarMenubar {
 
       const server = createServer((req, res) => {
         if (req.url === '/menu') {
+          this.#itemIds = []
+
           const lines = [this.#icon, '---']
 
           for (const item of this.#items) {
-            this.#renderInto(lines, item)
+            this.#renderInto(lines, item, '', this.#itemIds)
           }
 
           res.end(lines.join('\n') + '\n')
         } else if (req.url?.startsWith('/click/')) {
-          this.#emit('click', { id: decodeURIComponent(req.url.slice('/click/'.length)) })
+          const clickId = req.url.slice('/click/'.length)
+          const itemId = this.#itemIds[Number(clickId)]
+
+          if (itemId) {
+            this.#emit('click', { id: itemId })
+          }
 
           res.end('ok')
         } else {
@@ -100,14 +110,17 @@ export class SwiftbarMenubar {
     })
   }
 
-  #renderInto(lines: string[], item: MenuItem, indent = '') {
+  #renderInto(lines: string[], item: MenuItem, indent: string, itemIds: string[]) {
     if (item.separator) {
       lines.push(indent + '---')
       return
     }
 
+    const clickId = itemIds.length
+    itemIds.push(item.id)
+
     const title = indent + item.title
-    const url = `http://127.0.0.1:${this.#options.port}/click/${encodeURIComponent(item.id)}`
+    const url = `http://127.0.0.1:${this.#options.port}/click/${clickId}`
     let line = `${title} | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${url} terminal=false`
     if (item.shortcut) {
       line += ` shortcut=${item.shortcut}`
@@ -116,7 +129,7 @@ export class SwiftbarMenubar {
 
     if (item.children && item.children.length > 0) {
       for (const child of item.children) {
-        this.#renderInto(lines, child, indent + '--')
+        this.#renderInto(lines, child, indent + '--', itemIds)
       }
     }
   }
