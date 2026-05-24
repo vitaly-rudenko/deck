@@ -46,7 +46,7 @@ export class TmuxProvider implements Provider {
       let existingPane = this.#paneIds.get(pane.paneId)
       if (!existingPane) {
         existingPane = {
-          lastSignature: query.signature,
+          lastSignature: query.signature ?? '',
           lastUpdatedAt: undefined,
         }
 
@@ -67,7 +67,9 @@ export class TmuxProvider implements Provider {
         actions: [
           { id: 'focus', name: 'Focus', keymaps: ['Enter'], default: true },
           { id: 'prompt', name: 'Prompt', keymaps: [' ', 'm'], text: true },
-          ...(query.status === 'working' ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }] : []),
+          ...(query.status === 'working'
+            ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }]
+            : []),
           ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
           ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
         ],
@@ -136,7 +138,9 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
     }
   }
 
-  let type: 'pi' | 'claude_code' | undefined
+  let type: 'pi' | 'claude_code' | 'self' | undefined
+
+  const selfPid = process.pid
 
   const queue = [pid]
   while (queue.length > 0) {
@@ -146,6 +150,7 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
 
     if (/^pi(\s|$)/.test(process.command)) type = 'pi'
     if (/^claude(\s|$|-)/.test(process.command)) type = 'claude_code'
+    if (process.parentPid === selfPid) type = 'self'
 
     for (const [childPid, processInfo] of processes) {
       if (processInfo.parentPid === currentPid) {
@@ -166,11 +171,10 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
     if (stdout.includes('Allow') && stdout.includes('enter select')) {
       preview = lines.find(line => line.includes('Allow'))!
     } else if (stdout.includes('Working...')) {
-      const linesBeforeWorking = lines
-        .slice(
-          0,
-          lines.findIndex(line => line.includes('Working...')),
-        )
+      const linesBeforeWorking = lines.slice(
+        0,
+        lines.findIndex(line => line.includes('Working...')),
+      )
 
       preview = linesBeforeWorking.slice(-5).join(' ')
     } else {
@@ -262,6 +266,12 @@ async function queryPane(pid: number, paneId: string, paneTitle: string) {
           : stdout.includes('… (')
             ? 'working'
             : 'idle',
+    } as const
+  } else if (type === 'self') {
+    return {
+      name: 'Deck',
+      type: 'self',
+      status: 'idle',
     } as const
   } else {
     throw new Error(`Unknown type: ${type}`)

@@ -10,9 +10,8 @@ import type { Provider } from './provider.ts'
 import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
 
 const terminalAppName = process.env.DECK_TERMINAL_APP_NAME
-
 const swiftbarPluginsDir = process.env.DECK_SWIFTBAR_PLUGINS_DIR
-const port = process.env.DECK_SWIFTBAR_PORT ? parseInt(process.env.DECK_SWIFTBAR_PORT, 10) : undefined
+const port = process.env.DECK_SWIFTBAR_PORT ? Number(process.env.DECK_SWIFTBAR_PORT) : undefined
 
 const providers: Provider[] = [new TmuxProvider({ terminalAppName })]
 
@@ -54,7 +53,7 @@ const App: React.FC = () => {
       <Dashboard
         width={width}
         height={height}
-        widgets={widgets}
+        widgets={widgets?.filter(widget => widget.type !== 'self')}
         // TODO: which provider?
         view={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
         onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
@@ -128,8 +127,12 @@ const SwiftbarMenubarComponent: React.FC<{
               (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
               ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
             children: [
-              { id, title: widget.preview.length > 40 ? widget.preview.slice(0, 40) + '…' : widget.preview },
-              ...(widget.actions && widget.actions.length > 0 ? [{ id, title: '', separator: true }] : []),
+              ...(widget.preview
+                ? [
+                    { id, title: widget.preview.length > 40 ? widget.preview.slice(0, 40) + '…' : widget.preview },
+                    ...(widget.actions && widget.actions.length > 0 ? [{ id, title: '', separator: true }] : []),
+                  ]
+                : []),
               ...(widget.actions
                 ?.filter(action => !action.text)
                 .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })) ?? []),
@@ -335,7 +338,7 @@ const Dashboard: React.FC<{
           {widgets.map(widget => (
             <Text key={widget.id} wrap="truncate-end">
               {' '}
-              │ {widget.preview.trim()}
+              │ {widget.preview?.trim() ?? 'No preview'}
             </Text>
           ))}
         </Box>

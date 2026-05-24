@@ -5,7 +5,7 @@ export type Widget = {
   cwd: string
   status: 'idle' | 'working' | 'blocked'
   lastUpdatedAt?: Date
-  preview: string
+  preview?: string
 
   views?: {
     id: string
