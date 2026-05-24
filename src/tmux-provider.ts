@@ -58,17 +58,16 @@ export class TmuxProvider implements Provider {
         status: query.status,
         preview: query.preview,
         lastUpdatedAt: existingPane.lastUpdatedAt,
-        views: [{ id: 'primary', name: 'Primary', keymaps: ['?'] }],
+        views: [{ id: 'primary', name: 'Primary', keymaps: ['v', '?'] }],
         shortcut: query.type === 'self' ? this.#options.shortcut : undefined,
         actions: [
-          { id: 'focus', name: 'Focus', keymaps: ['Enter'], default: true },
-          { id: 'prompt', name: 'Prompt', keymaps: [' ', 'm'], text: true },
+          { id: 'focus', name: 'Focus', keymaps: ['Enter', 'f'], default: true },
+          { id: 'prompt', name: 'Prompt', keymaps: [' ', 'p'], text: true },
           ...(query.status === 'working'
             ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }]
             : []),
           ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
           ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
-          { id: 'kill', name: 'Kill', keymaps: ['x'], confirm: true },
         ],
         // TODO: Current permission state + Shift+Tab emulation
       })

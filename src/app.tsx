@@ -401,8 +401,12 @@ const Dashboard: React.FC<{
                 {widget.actions.map((action, i) => (
                   <Text key={action.id}>
                     {i > 0 ? ' · ' : ''}
-                    {action.keymaps[0] === ' ' ? 'space' : action.keymaps[0].toLowerCase()} to{' '}
-                    {action.name.toLowerCase()}
+                    {action.keymaps[0] === ' '
+                      ? 'space'
+                      : action.keymaps[0].length === 1
+                        ? action.keymaps[0]
+                        : action.keymaps[0].toLowerCase()}{' '}
+                    to {action.name.toLowerCase()}
                   </Text>
                 ))}
               </Box>
@@ -413,8 +417,12 @@ const Dashboard: React.FC<{
                 {widget.views.map((view, i) => (
                   <Text key={view.id}>
                     {i > 0 ? ' · ' : ''}
-                    {view.keymaps[0] === ' ' ? 'space' : view.keymaps[0].toLowerCase()} to view{' '}
-                    {view.name.toLowerCase()}
+                    {view.keymaps[0] === ' '
+                      ? 'space'
+                      : view.keymaps[0].length === 1
+                        ? view.keymaps[0]
+                        : view.keymaps[0].toLowerCase()}{' '}
+                    to view {view.name.toLowerCase()}
                   </Text>
                 ))}
               </Box>
