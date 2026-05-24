@@ -10,7 +10,7 @@ export class TmuxProvider implements Provider {
   #options
   #paneIds = new Map<string, { lastSignature: string; lastUpdatedAt?: Date }>()
 
-  constructor(options: { terminalAppName?: string }) {
+  constructor(options: { terminalAppName?: string; shortcut?: string }) {
     this.#options = options
   }
 
@@ -64,7 +64,7 @@ export class TmuxProvider implements Provider {
         preview: query.preview,
         lastUpdatedAt: existingPane.lastUpdatedAt,
         views: [{ id: 'primary', name: 'Primary', keymaps: ['?'] }],
-        shortcut: query.type === 'self' ? 'CMD+SHIFT+;' : undefined,
+        shortcut: query.type === 'self' ? this.#options.shortcut : undefined,
         actions: [
           { id: 'focus', name: 'Focus', keymaps: ['Enter'], default: true },
           { id: 'prompt', name: 'Prompt', keymaps: [' ', 'm'], text: true },

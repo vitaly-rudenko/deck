@@ -12,8 +12,9 @@ import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
 const terminalAppName = process.env.DECK_TERMINAL_APP_NAME
 const swiftbarPluginsDir = process.env.DECK_SWIFTBAR_PLUGINS_DIR
 const port = process.env.DECK_SWIFTBAR_PORT ? Number(process.env.DECK_SWIFTBAR_PORT) : undefined
+const shortcut = process.env.DECK_SHORTCUT
 
-const providers: Provider[] = [new TmuxProvider({ terminalAppName })]
+const providers: Provider[] = [new TmuxProvider({ terminalAppName, shortcut })]
 
 const App: React.FC = () => {
   const { exit } = useApp()
