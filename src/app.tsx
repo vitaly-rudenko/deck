@@ -128,22 +128,36 @@ const SwiftbarMenubarComponent: React.FC<{
           : widgets.some(widget => widget.status === 'working')
             ? '🟢'
             : '⚪️',
-        children: widgets.map(widget => {
-          const defaultAction = widget.actions?.find(action => action.default)
-          const id = defaultAction ? [widget.id, defaultAction.id].join(';;;') : '_'
+        children: widgets
+          .sort(a => (a.type === 'self' ? -1 : 1)) // Put 'self' widget on top
+          .map(widget => {
+            const defaultAction = widget.actions?.find(action => action.default)
+            const id = defaultAction ? [widget.id, defaultAction.id].join(';;;') : '_'
 
-          return {
-            id,
-            title:
-              (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
-              ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
-            shortcut: widget.shortcut,
-            children:
-              widget.actions
-                ?.filter(action => !action.text)
-                .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })) ?? [],
-          }
-        }),
+            if (widget.type === 'self') {
+              return {
+                id,
+                title: 'Deck',
+                shortcut: widget.shortcut,
+                children:
+                  widget.actions
+                    ?.filter(action => !action.text && !action.default)
+                    .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })),
+              }
+            }
+
+            return {
+              id,
+              title:
+                (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
+                ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
+              shortcut: widget.shortcut,
+              children:
+                widget.actions
+                  ?.filter(action => !action.text && !action.default)
+                  .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })),
+            }
+          }),
       })
     }
 
