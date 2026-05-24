@@ -126,6 +126,7 @@ const SwiftbarMenubarComponent: React.FC<{
             title:
               (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
               ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
+            shortcut: widget.shortcut,
             children: [
               ...(widget.preview
                 ? [

@@ -8,6 +8,7 @@ interface MenuItem {
   id: string
   title: string
   separator?: boolean
+  shortcut?: string
   children?: MenuItem[]
 }
 
@@ -107,7 +108,11 @@ export class SwiftbarMenubar {
 
     const title = indent + item.title
     const url = `http://127.0.0.1:${this.#options.port}/click/${encodeURIComponent(item.id)}`
-    lines.push(`${title} | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${url} terminal=false`)
+    let line = `${title} | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${url} terminal=false`
+    if (item.shortcut) {
+      line += ` shortcut=${item.shortcut}`
+    }
+    lines.push(line)
 
     if (item.children && item.children.length > 0) {
       for (const child of item.children) {

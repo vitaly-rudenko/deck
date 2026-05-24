@@ -64,6 +64,7 @@ export class TmuxProvider implements Provider {
         preview: query.preview,
         lastUpdatedAt: existingPane.lastUpdatedAt,
         views: [{ id: 'primary', name: 'Primary', keymaps: ['?'] }],
+        shortcut: query.type === 'self' ? 'CMD+SHIFT+;' : undefined,
         actions: [
           { id: 'focus', name: 'Focus', keymaps: ['Enter'], default: true },
           { id: 'prompt', name: 'Prompt', keymaps: [' ', 'm'], text: true },
