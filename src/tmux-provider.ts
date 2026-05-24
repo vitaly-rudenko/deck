@@ -72,6 +72,7 @@ export class TmuxProvider implements Provider {
             : []),
           ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
           ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
+          { id: 'kill', name: 'Kill', keymaps: ['x'], confirm: true },
         ],
         // TODO: Current permission state + Shift+Tab emulation
       })
@@ -120,6 +121,10 @@ export class TmuxProvider implements Provider {
       await execAsync(`tmux send-keys -t ${widgetId} Escape`)
     } else if (actionId === 'allow') {
       await execAsync(`tmux send-keys -t ${widgetId} Enter`)
+    } else if (actionId === 'kill') {
+      await execAsync(`tmux run-shell 'pkill -9 -P $(tmux display-message -t ${widgetId} -p "#{pane_pid}")'`).catch(
+        () => {},
+      )
     } else {
       throw new Error(`Unknown action: ${actionId}`)
     }
