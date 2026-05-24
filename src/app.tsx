@@ -122,6 +122,7 @@ const SwiftbarMenubarComponent: React.FC<{
         return
       }
 
+      let index = 0
       await menubar!.update({
         icon: widgets.some(widget => widget.status === 'blocked') //
           ? '🔴'
@@ -139,23 +140,24 @@ const SwiftbarMenubarComponent: React.FC<{
                 id,
                 title: 'Deck',
                 shortcut: widget.shortcut,
-                children:
-                  widget.actions
-                    ?.filter(action => !action.text && !action.default)
-                    .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })),
+                children: widget.actions
+                  ?.filter(action => !action.text && !action.default)
+                  .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })),
               }
             }
+
+            index++
 
             return {
               id,
               title:
+                `${index} ` +
                 (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
                 ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
               shortcut: widget.shortcut,
-              children:
-                widget.actions
-                  ?.filter(action => !action.text && !action.default)
-                  .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })),
+              children: widget.actions
+                ?.filter(action => !action.text && !action.default)
+                .map(action => ({ id: [widget.id, action.id].join(';;;'), title: action.name })),
             }
           }),
       })
