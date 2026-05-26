@@ -1,4 +1,4 @@
-export function formatTimeAgo(timestamp: Date | number | undefined, now: number = Date.now()): string {
+export function formatTimeAgo(timestamp: Date | number | undefined, now: number): string {
   if (timestamp === undefined) {
     return 'unknown'
   }
