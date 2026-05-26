@@ -174,60 +174,62 @@ async function queryPane(pid: number, paneId: string) {
 
   const capturePaneOutput = await execAsync(`tmux capture-pane -t ${paneId} -S 0 -J -p`)
   const stdout = capturePaneOutput.stdout
-  const lines = stdout.split('\n').map(line => line.trim())
+  const lines = stdout.split('\n')
 
   if (type === 'pi') {
-    // TODO: Refactor & optimize
-    let preview = ''
-    if (stdout.includes('Allow') && stdout.includes('enter select')) {
-      preview = lines.find(line => line.includes('Allow'))!
-    } else if (stdout.includes('Working...')) {
-      const linesBeforeWorking = lines.slice(
-        0,
-        lines.findIndex(line => line.includes('Working...')),
+    let previewStartIndex = 0
+    let previewEndIndex = Math.max(0, lines.length - 1)
+    let status: Widget['status']
+
+    if (stdout.includes('Allow') && stdout.includes('Deny') && stdout.includes('enter select')) {
+      const titleIndex = lines.findLastIndex(
+        line => line.trimStart().startsWith('Allow ') && line.trimEnd().endsWith('?'),
       )
-
-      preview = linesBeforeWorking.slice(-5).join(' ')
-    } else {
-      let block: string[] = []
-      for (let i = 0; i < lines.length; i++) {
-        const previousLine = lines[i - 1]
-        const line = lines[i]
-
-        // Prompt line starts, can stop querying
-        if (line.includes('────────────────────')) {
-          break
-        }
-
-        if (line) {
-          if (stdout.includes('Thinking...')) {
-            if (line === 'Thinking...') {
-              block = []
-              continue
-            }
-          } else if (!previousLine) {
-            block = []
-          }
-
-          block.push(line)
-        }
+      if (titleIndex === -1) {
+        throw new Error('Could not find title index')
       }
 
-      preview = block.join(' ')
+      const allowIndex = lines.findIndex((line, i) => i > titleIndex && line.trimEnd().endsWith('Allow'))
+
+      previewStartIndex = titleIndex
+      previewEndIndex = allowIndex === -1 ? titleIndex : allowIndex - 1
+      status = 'blocked'
+    } else if (stdout.includes('Working...')) {
+      const workingIndex = lines.findLastIndex(line => line.trimEnd().endsWith('Working...'))
+      if (workingIndex === -1) {
+        throw new Error('Could not find working index')
+      }
+
+      const thinkingIndex = lines.findLastIndex((line, i) => i < workingIndex && line.trim() === 'Thinking...')
+
+      previewStartIndex = thinkingIndex === -1 ? 0 : thinkingIndex + 1
+      previewEndIndex = workingIndex - 1
+      status = 'working'
+    } else {
+      const inputEndIndex = lines.findLastIndex(
+        line => line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+      )
+      if (inputEndIndex === -1) {
+        throw new Error('Could not find input end index')
+      }
+
+      const inputStartIndex = lines.findLastIndex(
+        (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+      )
+      if (inputStartIndex === -1) {
+        throw new Error('Could not find input start index')
+      }
+
+      const thinkingIndex = lines.findLastIndex((line, i) => i < inputStartIndex && line.trim() === 'Thinking...')
+
+      previewStartIndex = thinkingIndex === -1 ? 0 : thinkingIndex + 1
+      previewEndIndex = inputStartIndex - 1
+      status = 'idle'
     }
 
-    return {
-      // NOTE: pi doesn't set auto-title
-      type: 'pi',
-      signature: stdout,
-      preview,
-      status:
-        stdout.includes('Allow') && stdout.includes('enter select') //
-          ? 'blocked'
-          : stdout.includes('Working...')
-            ? 'working'
-            : 'idle',
-    } as const
+    const preview = normalizePreview(lines.slice(previewStartIndex, previewEndIndex))
+
+    return { type: 'pi', signature: preview, preview, status } as const
   } else if (type === 'claude_code') {
     // TODO: Refactor & optimize
     let preview = ''
@@ -285,4 +287,14 @@ async function queryPane(pid: number, paneId: string) {
   } else {
     throw new Error(`Unknown type: ${type}`)
   }
+}
+
+function normalizePreview(lines: string[]) {
+  // Remove empty lines before/after
+  while (lines.at(0)?.trim() === '') lines.shift()
+  while (lines.at(-1)?.trim() === '') lines.pop()
+
+  // De-indent
+  const minIndent = Math.min(...lines.filter(l => l.trim()).map(l => l.search(/\S/)))
+  return lines.map(l => l.slice(minIndent)).join('\n')
 }
