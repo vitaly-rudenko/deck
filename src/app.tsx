@@ -405,7 +405,7 @@ const Dashboard: React.FC<{
               <TextInput value={text} onChange={setText} />
             </Box>
             <Box marginLeft={2}>
-              <Text>enter to submit · escape to cancel</Text>
+              <Text dimColor>enter to submit · escape to cancel</Text>
             </Box>
           </Box>
         )}
@@ -415,7 +415,7 @@ const Dashboard: React.FC<{
             {!!widget.actions && (
               <Box>
                 {widget.actions.map((action, i) => (
-                  <Text key={action.id}>
+                  <Text key={action.id} dimColor>
                     {i > 0 ? ' · ' : ''}
                     {action.keymaps[0] === ' '
                       ? 'space'
@@ -431,7 +431,7 @@ const Dashboard: React.FC<{
             {!!widget.views && (
               <Box>
                 {widget.views.map((view, i) => (
-                  <Text key={view.id}>
+                  <Text key={view.id} dimColor>
                     {i > 0 ? ' · ' : ''}
                     {view.keymaps[0] === ' '
                       ? 'space'
