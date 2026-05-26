@@ -70,7 +70,6 @@ export class TmuxProvider implements Provider {
           ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
           ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
           { id: 'rename', name: 'Rename', keymaps: ['r'], text: true },
-          ...(pane.name ? [{ id: 'remove-name', name: 'Remove name', keymaps: ['R'], confirm: true }] : []),
         ],
         // TODO: Current permission state + Shift+Tab emulation
       })
@@ -110,12 +109,14 @@ export class TmuxProvider implements Provider {
         // Ignore if not on macOS or terminal app isn't running
       }
     } else if (actionId === 'prompt') {
-      if (!text) {
+      if (text === undefined) {
         throw new Error('No text provided')
       }
 
-      // TODO: Steering / follow-up
-      await execAsync(`tmux send-keys -t ${widgetId} "${text.replaceAll(/"/g, '\\"')}" Enter`)
+      if (text) {
+        // TODO: Steering / follow-up
+        await execAsync(`tmux send-keys -t ${widgetId} "${text.replaceAll(/"/g, '\\"')}" Enter`)
+      }
     } else if (actionId === 'interrupt' || actionId === 'deny') {
       await execAsync(`tmux send-keys -t ${widgetId} Escape`)
     } else if (actionId === 'allow') {
@@ -125,13 +126,15 @@ export class TmuxProvider implements Provider {
         () => {},
       )
     } else if (actionId === 'rename') {
-      if (!text) {
+      if (text === undefined) {
         throw new Error('No text provided')
       }
 
-      await execAsync(`tmux set -p -t ${widgetId} @deck_widget_name "${text}"`)
-    } else if (actionId === 'remove-name') {
-      await execAsync(`tmux set -pu -t ${widgetId} @deck_widget_name`)
+      if (text) {
+        await execAsync(`tmux set -p -t ${widgetId} @deck_widget_name "${text}"`)
+      } else {
+        await execAsync(`tmux set -pu -t ${widgetId} @deck_widget_name`)
+      }
     } else {
       throw new Error(`Unknown action: ${actionId}`)
     }

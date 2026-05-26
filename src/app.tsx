@@ -238,9 +238,7 @@ const Dashboard: React.FC<{
 
     if (textActionId) {
       if (key.return) {
-        if (text) {
-          onAction(widget.id, textActionId, text)
-        }
+        onAction(widget.id, textActionId, text)
 
         setTextActionId(undefined)
         setText('')
