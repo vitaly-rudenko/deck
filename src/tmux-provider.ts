@@ -19,7 +19,7 @@ export class TmuxProvider implements Provider {
     const listPanesOutput = await execAsync(
       `tmux list-panes -s \
          -t home \
-         -F '#{pane_id};;;#{pane_current_path};;;#{pane_pid};;;#{pane_title}'`,
+         -F '#{pane_id};;;#{pane_current_path};;;#{pane_pid};;;#{@deck_widget_name}'`,
       { encoding: 'utf-8' },
     )
 
@@ -29,7 +29,7 @@ export class TmuxProvider implements Provider {
       .filter(Boolean)
       .map(line => {
         const parts = line.split(';;;')
-        return { paneId: parts[0], cwd: parts[1], pid: Number(parts[2]) }
+        return { paneId: parts[0], cwd: parts[1], pid: Number(parts[2]), name: parts[3] }
       })
 
     const widgets: Widget[] = []
@@ -53,6 +53,7 @@ export class TmuxProvider implements Provider {
 
       widgets.push({
         id: pane.paneId,
+        name: pane.name || undefined,
         type: query.type,
         cwd: pane.cwd,
         status: query.status,
@@ -68,6 +69,8 @@ export class TmuxProvider implements Provider {
             : []),
           ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
           ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
+          { id: 'rename', name: 'Rename', keymaps: ['r'], text: true },
+          ...(pane.name ? [{ id: 'remove-name', name: 'Remove name', keymaps: ['R'], confirm: true }] : []),
         ],
         // TODO: Current permission state + Shift+Tab emulation
       })
@@ -121,6 +124,14 @@ export class TmuxProvider implements Provider {
       await execAsync(`tmux run-shell 'pkill -9 -P $(tmux display-message -t ${widgetId} -p "#{pane_pid}")'`).catch(
         () => {},
       )
+    } else if (actionId === 'rename') {
+      if (!text) {
+        throw new Error('No text provided')
+      }
+
+      await execAsync(`tmux set -p -t ${widgetId} @deck_widget_name "${text}"`)
+    } else if (actionId === 'remove-name') {
+      await execAsync(`tmux set -pu -t ${widgetId} @deck_widget_name`)
     } else {
       throw new Error(`Unknown action: ${actionId}`)
     }
