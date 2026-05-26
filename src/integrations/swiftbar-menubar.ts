@@ -89,6 +89,7 @@ export class SwiftbarMenubar {
         }
       })
 
+      server.on('error', () => resolve())
       server.listen(this.#options.port, '127.0.0.1', async () => {
         this.#server = server
 
