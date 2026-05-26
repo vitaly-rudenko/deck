@@ -8,6 +8,7 @@ import { TmuxProvider } from './tmux-provider.ts'
 import type { Widget } from './widget.ts'
 import type { Provider } from './provider.ts'
 import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
+import Spinner from 'ink-spinner'
 
 const terminalAppName = process.env.DECK_TERMINAL_APP_NAME
 const swiftbarPluginsDir = process.env.DECK_SWIFTBAR_PLUGINS_DIR
@@ -190,10 +191,6 @@ const Dashboard: React.FC<{
   const [view, setView] = useState<string>()
 
   const widget = useMemo(() => widgets?.[index], [widgets, index])
-  const shouldShowNames = useMemo(
-    () => widgets?.some(w1 => w1.name || widgets?.some(w2 => w1.type !== w2.type)),
-    [widgets],
-  )
 
   const handleAction = useCallback((widget: Widget, action: NonNullable<Widget['actions']>[number]) => {
     if (action.text) {
@@ -326,69 +323,53 @@ const Dashboard: React.FC<{
 
   return (
     <Box flexDirection="column" paddingY={1}>
-      <Box>
-        <Box flexDirection="column" flexShrink={0} maxWidth={4}>
-          <Text dimColor wrap="truncate">
-            {'  '}#
-          </Text>
-          {widgets.map((widget, j) => (
-            <Text key={widget.id} wrap="truncate-middle">
-              {j === index ? '› ' : '  '}
-              {j + 1}
-            </Text>
-          ))}
-        </Box>
-        <Box flexDirection="column" flexShrink={0} maxWidth={40}>
-          <Text dimColor wrap="truncate">
-            {' '}
-            Directory
-          </Text>
-          {widgets.map((widget, j) => (
-            <Text key={widget.id} wrap="truncate-middle">
-              {' '}
-              {collapseHomedir(widget.cwd)}
-            </Text>
-          ))}
-        </Box>
-        {shouldShowNames && (
-          <Box flexDirection="column" flexShrink={0} maxWidth={30}>
-            <Text dimColor wrap="truncate-end">
-              {' '}
-              │ Name
-            </Text>
-            {widgets.map(widget => (
-              <Text key={widget.id} wrap="truncate-end">
-                {' '}
-                │ {shouldShowNames ? getWidgetName(widget) : ''}
-                {widget.name}
+      <Box flexDirection="column" gap={1}>
+        {widgets.map((widget, i) => (
+          <Box key={i} flexDirection="column">
+            <Text>
+              {i === index ? '› ' : '  '}
+              {widget.status === 'working' ? (
+                <>
+                  <Spinner />
+                  <Text>{'  '}</Text>
+                </>
+              ) : (
+                <>
+                  <Text>{i + 1}. </Text>
+                </>
+              )}
+              {widget.name ? (
+                <>
+                  <Text bold>{widget.name}</Text> in <Text>{collapseHomedir(widget.cwd)}</Text>
+                </>
+              ) : (
+                <>
+                  <Text bold>{collapseHomedir(widget.cwd)}</Text>
+                </>
+              )}
+              <Text>: </Text>
+              <Text color={widget.status === 'idle' ? 'white' : widget.status === 'blocked' ? 'red' : 'green'}>
+                {widget.status}
               </Text>
-            ))}
+              {widget.lastUpdatedAt ? `, ${formatTimeAgo(widget.lastUpdatedAt, now)}` : ''}
+            </Text>
+            <Box flexDirection="column" backgroundColor="black" marginLeft={5} maxWidth={80}>
+              {widget.preview ? (
+                truncateLinesStart(
+                  widget.preview.split('\n'),
+                  truncated => <Text dimColor>({truncated} more lines)</Text>,
+                  10,
+                ).map((line, j) => (
+                  <Text key={j} wrap="truncate-end">
+                    {typeof line === 'string' ? <Text>{line.trimEnd() || ' '}</Text> : line}
+                  </Text>
+                ))
+              ) : (
+                <Text dimColor>[No preview]</Text>
+              )}
+            </Box>
           </Box>
-        )}
-        <Box flexDirection="column" flexShrink={0}>
-          <Text dimColor wrap="truncate-end">
-            {' '}
-            │ Status
-          </Text>
-          {widgets.map(widget => (
-            <Text key={widget.id} wrap="truncate-end">
-              {' '}
-              │ {widget.status}, {formatTimeAgo(widget.lastUpdatedAt?.getTime(), now)}
-            </Text>
-          ))}
-        </Box>
-        <Box flexDirection="column" flexShrink={1}>
-          <Text dimColor wrap="truncate-end">
-            {' '}
-            │ Preview
-          </Text>
-          {widgets.map(widget => (
-            <Text key={widget.id} wrap="truncate-end" italic>
-              {' '}
-              │ {widget.preview?.trim() ?? 'No preview'}
-            </Text>
-          ))}
-        </Box>
+        ))}
       </Box>
 
       <Box marginTop={1}>
@@ -448,6 +429,14 @@ const Dashboard: React.FC<{
       </Box>
     </Box>
   )
+}
+
+function truncateLinesStart<L, E>(lines: L[], ellipsis: (truncated: number) => E, maxLines: number, ellipsisLines = 1) {
+  if (lines.length > maxLines) {
+    return [ellipsis(lines.length - maxLines + ellipsisLines), ...lines.slice(-(maxLines - ellipsisLines))]
+  }
+
+  return lines
 }
 
 function matchKeymap(keymap: string, input: string, key: Key) {
