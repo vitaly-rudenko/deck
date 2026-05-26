@@ -457,3 +457,13 @@ function matchKeymap(keymap: string, input: string, key: Key) {
 }
 
 render(React.createElement(App))
+
+// Ensure the process always exits on signals, even if Ink's cleanup hangs.
+// SIGKILL is uncatchable and the OS restores terminal settings on exit.
+const forceExit = () => {
+  setTimeout(() => process.kill(process.pid, 'SIGKILL'), 1000).unref()
+  process.exit(0)
+}
+
+process.once('SIGINT', forceExit)
+process.once('SIGTERM', forceExit)
