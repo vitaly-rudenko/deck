@@ -1,15 +1,15 @@
-export function formatTimeAgo(timestamp: number | undefined, now: number): string {
-  if (!timestamp) {
+export function formatTimeAgo(timestamp: Date | number | undefined, now: number = Date.now()): string {
+  if (timestamp === undefined) {
     return 'unknown'
   }
 
-  const diffMs = now - timestamp
+  const diffMs = now - (typeof timestamp === 'number' ? timestamp : timestamp.getTime())
   const diffSec = Math.floor(diffMs / 1000)
 
-  if (diffSec < 5) return 'now'
-  if (diffSec < 60) return '<1m'
+  if (diffSec < 5) return 'just now'
+  if (diffSec < 60) return 'a minute ago'
   const diffMin = Math.floor(diffSec / 60)
-  if (diffMin < 60) return `${diffMin}m`
+  if (diffMin < 60) return `${diffMin} minutes ago`
   const diffHr = Math.floor(diffMin / 60)
-  return `${diffHr}h`
+  return `${diffHr} hours ago`
 }
