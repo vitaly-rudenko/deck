@@ -309,7 +309,7 @@ const Dashboard: React.FC<{
 
   if (!widgets) {
     return (
-      <Box flexDirection="column" paddingY={1}>
+      <Box flexDirection="column" paddingY={1} paddingX={2}>
         <Text>Loading widgets...</Text>
       </Box>
     )
@@ -317,7 +317,7 @@ const Dashboard: React.FC<{
 
   if (widgets.length === 0 || !widget) {
     return (
-      <Box flexDirection="column" paddingY={1}>
+      <Box flexDirection="column" paddingY={1} paddingX={2}>
         <Text>No widgets yet</Text>
       </Box>
     )
