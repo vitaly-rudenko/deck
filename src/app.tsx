@@ -1,5 +1,5 @@
 import TextInput from 'ink-text-input'
-import React, { useState, useEffect, useMemo, useCallback, FC } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, FC, useLayoutEffect } from 'react'
 import { render, Box, Text, useApp, useInput, Key, useStdout } from 'ink'
 
 import { collapseHomedir } from './utils/collapse-homedir.ts'
@@ -17,22 +17,16 @@ const shortcut = process.env.DECK_SHORTCUT
 
 const providers: Provider[] = [new TmuxProvider({ terminalAppName, shortcut })]
 
-const typeLabelMap: Record<string, string> = {
-  pi: 'Pi',
-  claude_code: 'Claude',
-}
-
-function getWidgetName(widget: Widget) {
-  const type = typeLabelMap[widget.type] ?? widget.type
-  return widget.name ? `${type}: ${widget.name}` : type
-}
-
 const App: React.FC = () => {
   const { exit } = useApp()
   const { stdout } = useStdout()
   const [widgets, setWidgets] = useState<Widget[]>()
   const [width, setWidth] = useState(() => stdout.columns)
   const [height, setHeight] = useState(() => stdout.rows)
+
+  useLayoutEffect(() => {
+    stdout.write('\x1b[2J\x1b[H') // Resets the cursor to the top left corner
+  }, [])
 
   useEffect(() => {
     async function fetch() {
@@ -455,7 +449,9 @@ const WidgetPreview: FC<{
         </Text>
       ))}
       {lines.map((line, i) => (
-        <Text key={i} wrap="truncate-end">{line.trimEnd() || ' '}</Text>
+        <Text key={i} wrap="truncate-end">
+          {line.trimEnd() || ' '}
+        </Text>
       ))}
     </Box>
   )
@@ -465,7 +461,7 @@ function matchKeymap(keymap: string, input: string, key: Key) {
   return (keymap === 'Enter' && key.return) || keymap === input
 }
 
-render(React.createElement(App))
+render(React.createElement(App), { alternateScreen: true })
 
 // Ensure the process always exits on signals, even if Ink's cleanup hangs.
 // SIGKILL is uncatchable and the OS restores terminal settings on exit.
