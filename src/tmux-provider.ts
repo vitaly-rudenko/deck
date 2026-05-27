@@ -186,8 +186,14 @@ async function queryPane(pid: number, paneId: string) {
     let status: Widget['status']
 
     if (stdout.includes('Allow') && stdout.includes('Deny') && stdout.includes('enter select')) {
-      const titleIndex = lines.findLastIndex(
-        line => line.trimStart().startsWith('Allow ') && line.trimEnd().endsWith('?'),
+      const titleIndex = lines.findLastIndex(line =>
+        [
+          //
+          'Allow write to ',
+          'Allow read from ',
+          'Allow edit to ',
+          'Allow `',
+        ].some(title => line.trimStart().startsWith(title)),
       )
       if (titleIndex === -1) {
         throw new Error('Could not find title index')
