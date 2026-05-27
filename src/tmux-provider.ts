@@ -10,7 +10,6 @@ const execAsync = promisify(exec)
 
 export class TmuxProvider implements Provider {
   #options
-  #paneIds = new Map<string, { lastSignature: string; lastUpdatedAt?: Date }>()
 
   constructor(options: { terminalAppName?: string; shortcut?: string }) {
     this.#options = options
@@ -39,19 +38,6 @@ export class TmuxProvider implements Provider {
       const query = await queryPane(pane.pid, pane.paneId)
       if (!query) continue
 
-      // TODO: refactor
-      let existingPane = this.#paneIds.get(pane.paneId)
-      if (!existingPane) {
-        existingPane = {
-          lastSignature: query.signature ?? '',
-          lastUpdatedAt: undefined,
-        }
-
-        this.#paneIds.set(pane.paneId, existingPane)
-      } else if (existingPane.lastSignature !== query.signature) {
-        existingPane.lastUpdatedAt = new Date()
-      }
-
       widgets.push({
         id: pane.paneId,
         name: pane.name || basename(pane.cwd),
@@ -59,7 +45,6 @@ export class TmuxProvider implements Provider {
         cwd: pane.cwd,
         status: query.status,
         preview: query.preview,
-        lastUpdatedAt: existingPane.lastUpdatedAt,
         views: [{ id: 'primary', name: 'Primary', keymaps: ['v', '?'] }],
         shortcut: query.type === 'self' ? this.#options.shortcut : undefined,
         actions: [
