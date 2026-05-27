@@ -1,5 +1,5 @@
 import TextInput from 'ink-text-input'
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, FC } from 'react'
 import { render, Box, Text, useApp, useInput, Key, useStdout } from 'ink'
 
 import { collapseHomedir } from './utils/collapse-homedir.ts'
@@ -322,17 +322,18 @@ const Dashboard: React.FC<{
   }
 
   return (
-    <Box flexDirection="column" paddingY={1}>
+    <Box flexDirection="column" paddingLeft={1} paddingY={1} maxWidth={80}>
       <Box flexDirection="column" gap={1}>
         {widgets.map((widget, i) => (
           <Box key={i} flexDirection="column">
             <Text>
-              {i === index ? '› ' : '  '}
               {widget.status === 'working' ? (
                 <>
                   <Spinner />
                   <Text>{'  '}</Text>
                 </>
+              ) : i === index ? (
+                <Text bold>{'›  '}</Text>
               ) : (
                 <>
                   <Text>{i + 1}. </Text>
@@ -353,46 +354,38 @@ const Dashboard: React.FC<{
               </Text>
               {widget.lastUpdatedAt ? `, ${formatTimeAgo(widget.lastUpdatedAt, now)}` : ''}
             </Text>
-            <Box flexDirection="column" backgroundColor="black" marginLeft={5} maxWidth={80}>
-              {widget.preview ? (
-                truncateLinesStart(
-                  widget.preview.split('\n'),
-                  truncated => <Text dimColor>({truncated} more lines)</Text>,
-                  10,
-                ).map((line, j) => (
-                  <Text key={j} wrap="truncate-end">
-                    {typeof line === 'string' ? <Text>{line.trimEnd() || ' '}</Text> : line}
-                  </Text>
-                ))
-              ) : (
-                <Text dimColor>[No preview]</Text>
-              )}
+            <Box flexDirection="column" backgroundColor="black" marginLeft={3}>
+              <WidgetPreview preview={widget.preview} expanded={i === index} />
             </Box>
+            {!!textActionId && i === index && (
+              <Box marginTop={1}>
+                <Text>{'›  '}</Text>
+                <Box backgroundColor="black" flexGrow={1}>
+                  <TextInput value={text} onChange={setText} />
+                </Box>
+              </Box>
+            )}
           </Box>
         ))}
       </Box>
 
       <Box marginTop={1}>
         {!!confirmActionId && (
-          <Box marginLeft={2}>
+          <Box marginLeft={3}>
             <Text>Confirm? (y/n)</Text>
           </Box>
         )}
 
         {!!textActionId && (
           <Box flexDirection="column">
-            <Box>
-              <Text>{'› '}</Text>
-              <TextInput value={text} onChange={setText} />
-            </Box>
-            <Box marginLeft={2}>
+            <Box marginLeft={3}>
               <Text dimColor>enter to submit · escape to cancel</Text>
             </Box>
           </Box>
         )}
 
         {!textActionId && !confirmActionId && (
-          <Box flexDirection="column" marginLeft={2}>
+          <Box flexDirection="column" marginLeft={3}>
             {!!widget.actions && (
               <Box>
                 {widget.actions.map((action, i) => (
@@ -431,12 +424,41 @@ const Dashboard: React.FC<{
   )
 }
 
-function truncateLinesStart<L, E>(lines: L[], ellipsis: (truncated: number) => E, maxLines: number, ellipsisLines = 1) {
-  if (lines.length > maxLines) {
-    return [ellipsis(lines.length - maxLines + ellipsisLines), ...lines.slice(-(maxLines - ellipsisLines))]
+const WidgetPreview: FC<{
+  preview?: string
+  expanded?: boolean
+}> = ({ preview, expanded }) => {
+  let lines = (preview ?? '').split('\n').map(line => line.trimEnd())
+
+  const requiredLines = expanded ? 10 : 5
+
+  let truncatedLines = 0
+  let gapLines = Math.max(0, requiredLines - lines.length)
+
+  if (lines.length > requiredLines) {
+    truncatedLines = lines.length - requiredLines + 1
+    lines = lines.slice(-requiredLines + 1)
   }
 
-  return lines
+  return (
+    <Box flexDirection="column">
+      {truncatedLines > 0 && (
+        <>
+          <Text dimColor wrap="truncate-end">
+            ({truncatedLines} more lines)
+          </Text>
+        </>
+      )}
+      {Array.from(new Array(gapLines), (_, i) => (
+        <Text key={i} dimColor>
+          ~
+        </Text>
+      ))}
+      {lines.map((line, i) => (
+        <Text key={i} wrap="truncate-end">{line.trimEnd() || ' '}</Text>
+      ))}
+    </Box>
+  )
 }
 
 function matchKeymap(keymap: string, input: string, key: Key) {
