@@ -83,9 +83,7 @@ export class TmuxProvider implements Provider {
   }
 
   async view(widgetId: string, viewId: string, height: number): Promise<string> {
-    if (viewId !== 'primary') {
-      throw new Error(`Unknown view: ${viewId}`)
-    }
+    if (viewId !== 'primary') return ''
 
     const capturePaneOutput = await execAsync(`tmux capture-pane -t ${widgetId} -S -${height} -J -p -e`)
     const stdout = capturePaneOutput.stdout.trim()
@@ -110,10 +108,6 @@ export class TmuxProvider implements Provider {
         // Ignore if not on macOS or terminal app isn't running
       }
     } else if (actionId === 'prompt') {
-      if (text === undefined) {
-        throw new Error('No text provided')
-      }
-
       if (text) {
         // TODO: Steering / follow-up
         await execAsync(`tmux send-keys -t ${widgetId} "${text.replaceAll(/"/g, '\\"')}" Enter`)
@@ -127,17 +121,11 @@ export class TmuxProvider implements Provider {
         () => {},
       )
     } else if (actionId === 'rename') {
-      if (text === undefined) {
-        throw new Error('No text provided')
-      }
-
       if (text) {
         await execAsync(`tmux set -p -t ${widgetId} @deck_widget_name "${text}"`)
       } else {
         await execAsync(`tmux set -pu -t ${widgetId} @deck_widget_name`)
       }
-    } else {
-      throw new Error(`Unknown action: ${actionId}`)
     }
   }
 }
@@ -185,55 +173,60 @@ async function queryPane(pid: number, paneId: string) {
     let previewEndIndex = Math.max(0, lines.length - 1)
     let status: Widget['status']
 
-    if (stdout.includes('Allow') && stdout.includes('Deny') && stdout.includes('enter select')) {
-      const titleIndex = lines.findLastIndex(line =>
-        [
-          //
-          'Allow write to ',
-          'Allow read from ',
-          'Allow edit to ',
-          'Allow `',
-        ].some(title => line.trimStart().startsWith(title)),
-      )
-      if (titleIndex === -1) {
-        throw new Error('Could not find title index')
+    try {
+      if (stdout.includes('Allow') && stdout.includes('Deny') && stdout.includes('enter select')) {
+        const titleIndex = lines.findLastIndex(line =>
+          [
+            //
+            'Allow write to ',
+            'Allow read from ',
+            'Allow edit to ',
+            'Allow `',
+          ].some(title => line.trimStart().startsWith(title)),
+        )
+        if (titleIndex === -1) {
+          throw new Error('Could not find title index')
+        }
+
+        const allowIndex = lines.findIndex((line, i) => i > titleIndex && line.trimEnd().endsWith('Allow'))
+
+        previewStartIndex = titleIndex
+        previewEndIndex = allowIndex === -1 ? titleIndex : allowIndex - 1
+        status = 'blocked'
+      } else if (stdout.includes('Working...')) {
+        const workingIndex = lines.findLastIndex(line => line.trimEnd().endsWith('Working...'))
+        if (workingIndex === -1) {
+          throw new Error('Could not find working index')
+        }
+
+        const thinkingIndex = lines.findLastIndex((line, i) => i < workingIndex && line.trim() === 'Thinking...')
+
+        previewStartIndex = thinkingIndex === -1 ? 0 : thinkingIndex + 1
+        previewEndIndex = workingIndex - 1
+        status = 'working'
+      } else {
+        const inputEndIndex = lines.findLastIndex(
+          line => line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+        )
+        if (inputEndIndex === -1) {
+          throw new Error('Could not find input end index')
+        }
+
+        const inputStartIndex = lines.findLastIndex(
+          (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+        )
+        if (inputStartIndex === -1) {
+          throw new Error('Could not find input start index')
+        }
+
+        const thinkingIndex = lines.findLastIndex((line, i) => i < inputStartIndex && line.trim() === 'Thinking...')
+
+        previewStartIndex = thinkingIndex === -1 ? 0 : thinkingIndex + 1
+        previewEndIndex = inputStartIndex - 1
+        status = 'idle'
       }
-
-      const allowIndex = lines.findIndex((line, i) => i > titleIndex && line.trimEnd().endsWith('Allow'))
-
-      previewStartIndex = titleIndex
-      previewEndIndex = allowIndex === -1 ? titleIndex : allowIndex - 1
-      status = 'blocked'
-    } else if (stdout.includes('Working...')) {
-      const workingIndex = lines.findLastIndex(line => line.trimEnd().endsWith('Working...'))
-      if (workingIndex === -1) {
-        throw new Error('Could not find working index')
-      }
-
-      const thinkingIndex = lines.findLastIndex((line, i) => i < workingIndex && line.trim() === 'Thinking...')
-
-      previewStartIndex = thinkingIndex === -1 ? 0 : thinkingIndex + 1
-      previewEndIndex = workingIndex - 1
-      status = 'working'
-    } else {
-      const inputEndIndex = lines.findLastIndex(
-        line => line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
-      )
-      if (inputEndIndex === -1) {
-        throw new Error('Could not find input end index')
-      }
-
-      const inputStartIndex = lines.findLastIndex(
-        (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
-      )
-      if (inputStartIndex === -1) {
-        throw new Error('Could not find input start index')
-      }
-
-      const thinkingIndex = lines.findLastIndex((line, i) => i < inputStartIndex && line.trim() === 'Thinking...')
-
-      previewStartIndex = thinkingIndex === -1 ? 0 : thinkingIndex + 1
-      previewEndIndex = inputStartIndex - 1
+    } catch (error) {
+      console.error(error)
       status = 'idle'
     }
 
@@ -245,54 +238,59 @@ async function queryPane(pid: number, paneId: string) {
     let previewEndIndex = Math.max(0, lines.length - 1)
     let status: Widget['status']
 
-    if (stdout.includes('Do you want to ') && stdout.includes('1. Yes') && stdout.includes('Esc to cancel')) {
-      const bashCommandIndex = lines.findLastIndex(line => line.trim() === 'Bash command')
-      const titleIndex = lines.findLastIndex(line => line.trimStart().startsWith('Do you want to '))
-      if (titleIndex === -1) {
-        throw new Error('Could not find title index')
+    try {
+      if (stdout.includes('Do you want to ') && stdout.includes('1. Yes') && stdout.includes('Esc to cancel')) {
+        const bashCommandIndex = lines.findLastIndex(line => line.trim() === 'Bash command')
+        const titleIndex = lines.findLastIndex(line => line.trimStart().startsWith('Do you want to '))
+        if (titleIndex === -1) {
+          throw new Error('Could not find title index')
+        }
+
+        const yesIndex = lines.findIndex((line, i) => i > titleIndex && line.trimEnd().endsWith('1. Yes'))
+
+        previewStartIndex = bashCommandIndex !== -1 ? bashCommandIndex + 1 : titleIndex
+        previewEndIndex = yesIndex === -1 ? titleIndex : yesIndex - 1
+        status = 'blocked'
+      } else if (stdout.includes('… (')) {
+        const workingIndex = lines.findLastIndex(line => line.includes('… ('))
+        if (workingIndex === -1) {
+          throw new Error('Could not find working index')
+        }
+
+        const messageIndex = lines.findLastIndex(
+          (line, i) => i < workingIndex && (line.trimStart().startsWith('⏺ ') || line.trimStart().startsWith('❯ ')),
+        )
+
+        previewStartIndex = messageIndex === -1 ? 0 : messageIndex
+        previewEndIndex = workingIndex
+        status = 'working'
+      } else {
+        const inputEndIndex = lines.findLastIndex(
+          line => line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+        )
+        if (inputEndIndex === -1) {
+          throw new Error('Could not find input end index')
+        }
+
+        const inputStartIndex = lines.findLastIndex(
+          (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+        )
+        if (inputStartIndex === -1) {
+          throw new Error('Could not find input start index')
+        }
+
+        const messageIndex = lines.findLastIndex(
+          (line, i) => i < inputStartIndex && (line.trimStart().startsWith('⏺ ') || line.trimStart().startsWith('❯ ')),
+        )
+
+        previewStartIndex = messageIndex === -1 ? 0 : messageIndex
+        previewEndIndex = /^. [\w ]+ for [\d sm]+$/.test(lines[inputStartIndex - 2] ?? '') // ✻ Cogitated for 4s
+          ? inputStartIndex - 3
+          : inputStartIndex - 1
+        status = 'idle'
       }
-
-      const yesIndex = lines.findIndex((line, i) => i > titleIndex && line.trimEnd().endsWith('1. Yes'))
-
-      previewStartIndex = bashCommandIndex !== -1 ? bashCommandIndex + 1 : titleIndex
-      previewEndIndex = yesIndex === -1 ? titleIndex : yesIndex - 1
-      status = 'blocked'
-    } else if (stdout.includes('… (')) {
-      const workingIndex = lines.findLastIndex(line => line.includes('… ('))
-      if (workingIndex === -1) {
-        throw new Error('Could not find working index')
-      }
-
-      const messageIndex = lines.findLastIndex(
-        (line, i) => i < workingIndex && (line.trimStart().startsWith('⏺ ') || line.trimStart().startsWith('❯ ')),
-      )
-
-      previewStartIndex = messageIndex === -1 ? 0 : messageIndex
-      previewEndIndex = workingIndex
-      status = 'working'
-    } else {
-      const inputEndIndex = lines.findLastIndex(
-        line => line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
-      )
-      if (inputEndIndex === -1) {
-        throw new Error('Could not find input end index')
-      }
-
-      const inputStartIndex = lines.findLastIndex(
-        (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
-      )
-      if (inputStartIndex === -1) {
-        throw new Error('Could not find input start index')
-      }
-
-      const messageIndex = lines.findLastIndex(
-        (line, i) => i < inputStartIndex && (line.trimStart().startsWith('⏺ ') || line.trimStart().startsWith('❯ ')),
-      )
-
-      previewStartIndex = messageIndex === -1 ? 0 : messageIndex
-      previewEndIndex = /^. [\w ]+ for [\d sm]+$/.test(lines[inputStartIndex - 2] ?? '') // ✻ Cogitated for 4s
-        ? inputStartIndex - 3
-        : inputStartIndex - 1
+    } catch (error) {
+      console.error(error)
       status = 'idle'
     }
 
