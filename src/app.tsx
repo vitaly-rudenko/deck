@@ -338,7 +338,7 @@ const Dashboard: React.FC<{
   }
 
   return (
-    <Box flexDirection="column" paddingRight={2} paddingBottom={1} maxWidth={120}>
+    <Box flexDirection="column" paddingRight={2} paddingBottom={1} maxWidth={100}>
       <Box justifyContent="center">
         <Text dimColor>{scrollOffset > 0 ? '▲ more' : ' '}</Text>
       </Box>
@@ -346,36 +346,55 @@ const Dashboard: React.FC<{
         {/* NOTE: Minimize dynamic height changes in list items, it makes the list flicker and jump */}
         {widgets.map((widget, i) => (
           <Box key={i} marginBottom={1} flexDirection="column">
-            <Box>
-              <Text>
-                {i === index ? (
-                  <Text
-                    bold
-                    color={widget.status === 'working' ? 'green' : widget.status === 'blocked' ? 'red' : undefined}
-                  >
-                    {'› '}
-                  </Text>
-                ) : widget.status === 'working' ? (
-                  <>
-                    <Text color="green">
-                      <Spinner />
-                    </Text>{' '}
-                  </>
-                ) : widget.status === 'blocked' ? (
-                  <Text color="red">{'? '}</Text>
-                ) : (
-                  <Text dimColor>{'  '}</Text>
-                )}
-                <Text bold color={widget.status === 'idle' ? undefined : widget.status === 'blocked' ? 'red' : 'green'}>
-                  {widget.name}
-                </Text>
-              </Text>
-              <Spacer />
-              <Text dimColor> {collapseHomedir(widget.cwd)}</Text>
-            </Box>
             <Box flexDirection="column" backgroundColor="black" marginLeft={2}>
               <WidgetPreview preview={widget.preview} expanded={i === index && expanded} />
             </Box>
+            {!!confirmActionId && i === index ? (
+              <Box>
+                <Text>
+                  › Confirm {widget.actions!.find(action => action.id === confirmActionId)!.name.toLowerCase()}?
+                </Text>
+                <Text dimColor> (y/n)</Text>
+              </Box>
+            ) : !!textActionId && i === index ? (
+              <Box>
+                <Text>{'› '}</Text>
+                <Box flexGrow={1}>
+                  <TextInput value={text} onChange={setText} />
+                </Box>
+              </Box>
+            ) : (
+              <Box>
+                <Text>
+                  {i === index ? (
+                    <Text
+                      bold
+                      color={widget.status === 'working' ? 'green' : widget.status === 'blocked' ? 'red' : undefined}
+                    >
+                      {'› '}
+                    </Text>
+                  ) : widget.status === 'working' ? (
+                    <>
+                      <Text color="green">
+                        <Spinner />
+                      </Text>{' '}
+                    </>
+                  ) : widget.status === 'blocked' ? (
+                    <Text color="red">{'? '}</Text>
+                  ) : (
+                    <Text dimColor>{'  '}</Text>
+                  )}
+                  <Text
+                    bold
+                    color={widget.status === 'idle' ? undefined : widget.status === 'blocked' ? 'red' : 'green'}
+                  >
+                    {widget.name}
+                  </Text>
+                </Text>
+                <Spacer />
+                <Text dimColor> {collapseHomedir(widget.cwd)}</Text>
+              </Box>
+            )}
           </Box>
         ))}
       </ScrollList>
@@ -384,69 +403,43 @@ const Dashboard: React.FC<{
       </Box>
 
       <Box ref={toolbarRef} marginTop={1}>
-        {!!confirmActionId && (
-          <Box marginLeft={2}>
-            <Text>Confirm? (y/n)</Text>
-          </Box>
-        )}
+        <Box flexDirection="column" marginLeft={2}>
+          {!!widget.actions && (
+            <Text dimColor wrap="truncate-end">
+              {widget.actions.map((action, i) => (
+                <Fragment key={i}>
+                  {i > 0 ? ' · ' : ''}
+                  {action.keymaps[0] === ' '
+                    ? 'space'
+                    : action.keymaps[0].length === 1
+                      ? action.keymaps[0]
+                      : action.keymaps[0].toLowerCase()}{' '}
+                  to {action.name.toLowerCase()}
+                </Fragment>
+              ))}
+              {' · '}
+              {expanded ? 'e to collapse' : 'e to expand'}
+            </Text>
+          )}
 
-        {!!textActionId && (
-          <Box flexDirection="column" flexGrow={1} marginBottom={1}>
+          {!!widget.views && (
             <Box>
-              <Text>{'› '}</Text>
-              <Box backgroundColor="black" flexGrow={1}>
-                <TextInput value={text} onChange={setText} />
-              </Box>
-            </Box>
-            <Box marginLeft={2}>
-              <Text dimColor>enter to submit · escape to cancel</Text>
-            </Box>
-          </Box>
-        )}
-
-        {!textActionId && !confirmActionId && (
-          <Box flexDirection="column" marginLeft={2}>
-            {!!widget.actions && (
               <Text dimColor wrap="truncate-end">
-                {widget.actions.map((action, i) => (
+                {widget.views.map((view, i) => (
                   <Fragment key={i}>
                     {i > 0 ? ' · ' : ''}
-                    {action.keymaps[0] === ' '
+                    {view.keymaps[0] === ' '
                       ? 'space'
-                      : action.keymaps[0].length === 1
-                        ? action.keymaps[0]
-                        : action.keymaps[0].toLowerCase()}{' '}
-                    to {action.name.toLowerCase()}
+                      : view.keymaps[0].length === 1
+                        ? view.keymaps[0]
+                        : view.keymaps[0].toLowerCase()}{' '}
+                    to view {view.name.toLowerCase()}
                   </Fragment>
                 ))}
               </Text>
-            )}
-
-            {!!widget.views && (
-              <Box>
-                <Text dimColor wrap="truncate-end">
-                  {widget.views.map((view, i) => (
-                    <Fragment key={i}>
-                      {i > 0 ? ' · ' : ''}
-                      {view.keymaps[0] === ' '
-                        ? 'space'
-                        : view.keymaps[0].length === 1
-                          ? view.keymaps[0]
-                          : view.keymaps[0].toLowerCase()}{' '}
-                      to view {view.name.toLowerCase()}
-                    </Fragment>
-                  ))}
-                </Text>
-              </Box>
-            )}
-
-            <Box>
-              <Text dimColor wrap="truncate-end">
-                {expanded ? 'e to collapse' : 'e to expand'}
-              </Text>
             </Box>
-          </Box>
-        )}
+          )}
+        </Box>
       </Box>
     </Box>
   )
