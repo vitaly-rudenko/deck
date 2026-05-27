@@ -237,58 +237,68 @@ async function queryPane(pid: number, paneId: string) {
       status = 'idle'
     }
 
-    const preview = normalizePreview(lines.slice(previewStartIndex, previewEndIndex))
+    const preview = normalizePreview(lines.slice(previewStartIndex, previewEndIndex + 1))
 
     return { type: 'pi', signature: preview, preview, status } as const
   } else if (type === 'claude_code') {
-    // TODO: Refactor & optimize
-    let preview = ''
-    if (stdout.includes('Do you want to') && stdout.includes('1. Yes') && stdout.includes('Esc to cancel')) {
-      preview = lines.find(line => line.includes('Do you want to'))!
-    } else {
-      let blocks: string[][] = [[]]
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]
+    let previewStartIndex = 0
+    let previewEndIndex = Math.max(0, lines.length - 1)
+    let status: Widget['status']
 
-        // Prompt line starts, can stop querying
-        if (line.includes('────────────────────')) {
-          break
-        }
-
-        if (line) {
-          if (line.startsWith('⏺ ') || line.startsWith('❯ ')) {
-            blocks.push([])
-          }
-
-          blocks[blocks.length - 1].push(line)
-        }
+    if (stdout.includes('Do you want to ') && stdout.includes('1. Yes') && stdout.includes('Esc to cancel')) {
+      const bashCommandIndex = lines.findLastIndex(line => line.trim() === 'Bash command')
+      const titleIndex = lines.findLastIndex(line => line.trimStart().startsWith('Do you want to '))
+      if (titleIndex === -1) {
+        throw new Error('Could not find title index')
       }
 
-      const blockEndIndex = blocks[blocks.length - 1].findIndex(
-        line =>
-          // Churned for 5s
-          /^. [A-Z][a-z ]+ for [\d sm]+$/.test(line) ||
-          // Simulating productivity… (5s)
-          line.includes('… ('),
+      const yesIndex = lines.findIndex((line, i) => i > titleIndex && line.trimEnd().endsWith('1. Yes'))
+
+      previewStartIndex = bashCommandIndex !== -1 ? bashCommandIndex + 1 : titleIndex
+      previewEndIndex = yesIndex === -1 ? titleIndex : yesIndex - 1
+      status = 'blocked'
+    } else if (stdout.includes('… (')) {
+      const workingIndex = lines.findLastIndex(line => line.includes('… ('))
+      if (workingIndex === -1) {
+        throw new Error('Could not find working index')
+      }
+
+      const messageIndex = lines.findLastIndex(
+        (line, i) => i < workingIndex && (line.trimStart().startsWith('⏺ ') || line.trimStart().startsWith('❯ ')),
       )
-      if (blockEndIndex !== -1) {
-        blocks[blocks.length - 1] = blocks[blocks.length - 1].slice(0, blockEndIndex)
+
+      previewStartIndex = messageIndex === -1 ? 0 : messageIndex
+      previewEndIndex = workingIndex
+      status = 'working'
+    } else {
+      const inputEndIndex = lines.findLastIndex(
+        line => line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+      )
+      if (inputEndIndex === -1) {
+        throw new Error('Could not find input end index')
       }
 
-      preview = blocks[blocks.length - 1].join(' ')
+      const inputStartIndex = lines.findLastIndex(
+        (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+      )
+      if (inputStartIndex === -1) {
+        throw new Error('Could not find input start index')
+      }
+
+      const messageIndex = lines.findLastIndex(
+        (line, i) => i < inputStartIndex && (line.trimStart().startsWith('⏺ ') || line.trimStart().startsWith('❯ ')),
+      )
+
+      previewStartIndex = messageIndex === -1 ? 0 : messageIndex
+      previewEndIndex = /^. [\w ]+ for [\d sm]+$/.test(lines[inputStartIndex - 2] ?? '') // ✻ Cogitated for 4s
+        ? inputStartIndex - 3
+        : inputStartIndex - 1
+      status = 'idle'
     }
 
-    return {
-      type: 'claude_code',
-      signature: stdout,
-      preview,
-      status:
-        stdout.includes('Do you want to') && stdout.includes('1. Yes') && stdout.includes('Esc to cancel') //
-          ? 'blocked'
-          : stdout.includes('… (')
-            ? 'working'
-            : 'idle',
-    } as const
+    const preview = normalizePreview(lines.slice(previewStartIndex, previewEndIndex + 1))
+
+    return { type: 'claude_code', signature: preview, preview, status } as const
   } else if (type === 'self') {
     return {
       type: 'self',
