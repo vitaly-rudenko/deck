@@ -1,6 +1,6 @@
 import TextInput from 'ink-text-input'
-import React, { useState, useEffect, useMemo, useCallback, FC, useLayoutEffect } from 'react'
-import { render, Box, Text, useApp, useInput, Key, useStdout } from 'ink'
+import React, { useState, useEffect, useMemo, useCallback, FC, useLayoutEffect, useRef } from 'react'
+import { render, Box, Text, useApp, useInput, Key, useStdout, DOMElement, measureElement, useWindowSize } from 'ink'
 
 import { collapseHomedir } from './utils/collapse-homedir.ts'
 import { formatTimeAgo } from './utils/format-time-ago.ts'
@@ -9,6 +9,7 @@ import type { Widget } from './widget.ts'
 import type { Provider } from './provider.ts'
 import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
 import Spinner from 'ink-spinner'
+import { ScrollList, ScrollListRef } from 'ink-scroll-list'
 
 const terminalAppName = process.env.DECK_TERMINAL_APP_NAME
 const swiftbarPluginsDir = process.env.DECK_SWIFTBAR_PLUGINS_DIR
@@ -21,8 +22,6 @@ const App: React.FC = () => {
   const { exit } = useApp()
   const { stdout } = useStdout()
   const [widgets, setWidgets] = useState<Widget[]>()
-  const [width, setWidth] = useState(() => stdout.columns)
-  const [height, setHeight] = useState(() => stdout.rows)
 
   useLayoutEffect(() => {
     stdout.write('\x1b[2J\x1b[H') // Resets the cursor to the top left corner
@@ -42,23 +41,12 @@ const App: React.FC = () => {
     const intervalId = setInterval(fetch, 1000)
     fetch()
 
-    stdout.on('resize', onResize)
-    function onResize() {
-      setWidth(stdout.columns)
-      setHeight(stdout.rows)
-    }
-
-    return () => {
-      clearInterval(intervalId)
-      stdout.off('resize', onResize)
-    }
+    return () => clearInterval(intervalId)
   }, [])
 
   return (
     <>
       <Dashboard
-        width={width}
-        height={height}
         widgets={widgets?.filter(widget => widget.type !== 'self')}
         // TODO: which provider?
         view={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
@@ -168,14 +156,17 @@ const SwiftbarMenubarComponent: React.FC<{
 }
 
 const Dashboard: React.FC<{
-  width: number
-  height: number
-
   widgets: Widget[] | undefined
   view: (widgetId: string, viewId: string, height: number) => Promise<string>
   onAction: (widgetId: string, actionId: string, text?: string) => Promise<void>
   onExit: () => void
-}> = ({ height, widgets, view: getView, onAction, onExit }) => {
+}> = ({ widgets, view: getView, onAction, onExit }) => {
+  const { stdout } = useStdout()
+  const { rows, columns } = useWindowSize()
+  const listRef = useRef<ScrollListRef>(null)
+  const toolbarRef = useRef<DOMElement>(null)
+  const [toolbarHeight, setToolbarHeight] = useState(0)
+
   const [now, setNow] = useState(() => Date.now())
   const [index, setIndex] = useState(0)
   const [text, setText] = useState('')
@@ -183,6 +174,26 @@ const Dashboard: React.FC<{
   const [confirmActionId, setConfirmActionId] = useState<string>()
   const [viewId, setViewId] = useState<string>()
   const [view, setView] = useState<string>()
+  const [scrollOffset, setScrollOffset] = useState(0)
+  const [bottomOffset, setBottomOffset] = useState(0)
+
+  useEffect(() => {
+    if (toolbarRef.current) {
+      setToolbarHeight(measureElement(toolbarRef.current).height)
+    }
+
+    if (listRef.current) {
+      setBottomOffset(listRef.current?.getBottomOffset() ?? 0)
+    }
+  })
+
+  useEffect(() => {
+    const onResize = () => listRef.current?.remeasure()
+    stdout?.on('resize', onResize)
+    return () => {
+      stdout?.off('resize', onResize)
+    }
+  }, [stdout])
 
   const widget = useMemo(() => widgets?.[index], [widgets, index])
 
@@ -209,7 +220,7 @@ const Dashboard: React.FC<{
     if (!viewId) return
 
     async function fetch() {
-      setView(await getView(widget!.id, viewId!, height))
+      setView(await getView(widget!.id, viewId!, columns))
     }
 
     const intervalId = setInterval(fetch, 1000)
@@ -316,8 +327,11 @@ const Dashboard: React.FC<{
   }
 
   return (
-    <Box flexDirection="column" paddingLeft={1} paddingY={1} maxWidth={80}>
-      <Box flexDirection="column" gap={1}>
+    <Box flexDirection="column" paddingLeft={1} paddingBottom={1} maxWidth={80}>
+      <Box justifyContent="center">
+        <Text dimColor>{scrollOffset > 0 ? '▲ more' : ' '}</Text>
+      </Box>
+      <ScrollList ref={listRef} selectedIndex={index} height={rows - toolbarHeight - 3} onScroll={setScrollOffset}>
         {widgets.map((widget, i) => (
           <Box key={i} flexDirection="column">
             <Text>
@@ -361,58 +375,63 @@ const Dashboard: React.FC<{
             )}
           </Box>
         ))}
+      </ScrollList>
+      <Box justifyContent="center">
+        <Text dimColor>{scrollOffset < bottomOffset ? '▼ more' : ' '}</Text>
       </Box>
 
-      <Box marginTop={1}>
-        {!!confirmActionId && (
-          <Box marginLeft={3}>
-            <Text>Confirm? (y/n)</Text>
-          </Box>
-        )}
-
-        {!!textActionId && (
-          <Box flexDirection="column">
+      <Box ref={toolbarRef}>
+        <Box marginTop={1}>
+          {!!confirmActionId && (
             <Box marginLeft={3}>
-              <Text dimColor>enter to submit · escape to cancel</Text>
+              <Text>Confirm? (y/n)</Text>
             </Box>
-          </Box>
-        )}
+          )}
 
-        {!textActionId && !confirmActionId && (
-          <Box flexDirection="column" marginLeft={3}>
-            {!!widget.actions && (
-              <Box>
-                {widget.actions.map((action, i) => (
-                  <Text key={action.id} dimColor>
-                    {i > 0 ? ' · ' : ''}
-                    {action.keymaps[0] === ' '
-                      ? 'space'
-                      : action.keymaps[0].length === 1
-                        ? action.keymaps[0]
-                        : action.keymaps[0].toLowerCase()}{' '}
-                    to {action.name.toLowerCase()}
-                  </Text>
-                ))}
+          {!!textActionId && (
+            <Box flexDirection="column">
+              <Box marginLeft={3}>
+                <Text dimColor>enter to submit · escape to cancel</Text>
               </Box>
-            )}
+            </Box>
+          )}
 
-            {!!widget.views && (
-              <Box>
-                {widget.views.map((view, i) => (
-                  <Text key={view.id} dimColor>
-                    {i > 0 ? ' · ' : ''}
-                    {view.keymaps[0] === ' '
-                      ? 'space'
-                      : view.keymaps[0].length === 1
-                        ? view.keymaps[0]
-                        : view.keymaps[0].toLowerCase()}{' '}
-                    to view {view.name.toLowerCase()}
-                  </Text>
-                ))}
-              </Box>
-            )}
-          </Box>
-        )}
+          {!textActionId && !confirmActionId && (
+            <Box flexDirection="column" marginLeft={3}>
+              {!!widget.actions && (
+                <Box>
+                  {widget.actions.map((action, i) => (
+                    <Text key={action.id} dimColor>
+                      {i > 0 ? ' · ' : ''}
+                      {action.keymaps[0] === ' '
+                        ? 'space'
+                        : action.keymaps[0].length === 1
+                          ? action.keymaps[0]
+                          : action.keymaps[0].toLowerCase()}{' '}
+                      to {action.name.toLowerCase()}
+                    </Text>
+                  ))}
+                </Box>
+              )}
+
+              {!!widget.views && (
+                <Box>
+                  {widget.views.map((view, i) => (
+                    <Text key={view.id} dimColor>
+                      {i > 0 ? ' · ' : ''}
+                      {view.keymaps[0] === ' '
+                        ? 'space'
+                        : view.keymaps[0].length === 1
+                          ? view.keymaps[0]
+                          : view.keymaps[0].toLowerCase()}{' '}
+                      to view {view.name.toLowerCase()}
+                    </Text>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
     </Box>
   )
