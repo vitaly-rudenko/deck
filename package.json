@@ -1,6 +1,6 @@
 {
   "name": "@vitalyrudenko/deck",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "A deck for your widgets",
   "main": "dist/index.js",
   "bin": {
