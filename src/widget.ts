@@ -1,6 +1,6 @@
 export type Widget = {
   id: string
-  name?: string
+  name: string
   type: string
   cwd: string
   status: 'idle' | 'working' | 'blocked'

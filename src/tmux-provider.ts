@@ -4,6 +4,7 @@ import { promisify } from 'node:util'
 import type { Provider } from './provider'
 import type { Widget } from './widget'
 import { setTimeout as setTimeoutAsync } from 'node:timers/promises'
+import { basename } from 'node:path'
 
 const execAsync = promisify(exec)
 
@@ -53,7 +54,7 @@ export class TmuxProvider implements Provider {
 
       widgets.push({
         id: pane.paneId,
-        name: pane.name || undefined,
+        name: pane.name || basename(pane.cwd),
         type: query.type,
         cwd: pane.cwd,
         status: query.status,
@@ -293,6 +294,8 @@ async function queryPane(pid: number, paneId: string) {
 }
 
 function normalizePreview(lines: string[]) {
+  lines = lines.map(line => line.replaceAll(/\s/g, ' ')) // Tabs mess up with widths
+
   // Remove empty lines before/after
   while (lines.at(0)?.trim() === '') lines.shift()
   while (lines.at(-1)?.trim() === '') lines.pop()
