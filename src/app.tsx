@@ -1,9 +1,20 @@
 import TextInput from 'ink-text-input'
-import React, { useState, useEffect, useMemo, useCallback, FC, useLayoutEffect, useRef } from 'react'
-import { render, Box, Text, useApp, useInput, Key, useStdout, DOMElement, measureElement, useWindowSize } from 'ink'
+import React, { useState, useEffect, useMemo, useCallback, FC, useLayoutEffect, useRef, Fragment } from 'react'
+import {
+  render,
+  Box,
+  Text,
+  useApp,
+  useInput,
+  Key,
+  useStdout,
+  DOMElement,
+  measureElement,
+  useWindowSize,
+  Spacer,
+} from 'ink'
 
 import { collapseHomedir } from './utils/collapse-homedir.ts'
-import { formatTimeAgo } from './utils/format-time-ago.ts'
 import { TmuxProvider } from './tmux-provider.ts'
 import type { Widget } from './widget.ts'
 import type { Provider } from './provider.ts'
@@ -133,10 +144,7 @@ const SwiftbarMenubarComponent: React.FC<{
 
             return {
               id,
-              title:
-                `${index} ` +
-                (widget.name ? `${collapseHomedir(widget.cwd)} (${widget.name})` : collapseHomedir(widget.cwd)) +
-                ` [${widget.status}, ${formatTimeAgo(widget.lastUpdatedAt?.getTime(), Date.now())}]`,
+              title: `${widget.name}, ${widget.status}`,
               shortcut: widget.shortcut,
               children: widget.actions
                 ?.filter(action => !action.text && !action.default)
@@ -176,6 +184,7 @@ const Dashboard: React.FC<{
   const [view, setView] = useState<string>()
   const [scrollOffset, setScrollOffset] = useState(0)
   const [bottomOffset, setBottomOffset] = useState(0)
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     if (toolbarRef.current) {
@@ -278,6 +287,8 @@ const Dashboard: React.FC<{
       setIndex(i => (i === widgets.length - 1 ? 0 : i + 1))
     } else if (input === 'q' || key.escape) {
       onExit()
+    } else if (input === 'e') {
+      setExpanded(!expanded)
     } else if (/^[1-9]$/.test(input)) {
       const targetIndex = Number(input) - 1
       if (targetIndex < widgets.length) {
@@ -327,52 +338,44 @@ const Dashboard: React.FC<{
   }
 
   return (
-    <Box flexDirection="column" paddingLeft={1} paddingBottom={1} maxWidth={80}>
+    <Box flexDirection="column" paddingRight={2} paddingBottom={1} maxWidth={120}>
       <Box justifyContent="center">
         <Text dimColor>{scrollOffset > 0 ? '▲ more' : ' '}</Text>
       </Box>
-      <ScrollList ref={listRef} selectedIndex={index} height={rows - toolbarHeight - 3} onScroll={setScrollOffset}>
+      <ScrollList ref={listRef} selectedIndex={index} height={rows - toolbarHeight - 4} onScroll={setScrollOffset}>
+        {/* NOTE: Minimize dynamic height changes in list items, it makes the list flicker and jump */}
         {widgets.map((widget, i) => (
-          <Box key={i} flexDirection="column">
-            <Text>
-              {widget.status === 'working' ? (
-                <>
-                  <Spinner />
-                  <Text>{'  '}</Text>
-                </>
-              ) : i === index ? (
-                <Text bold>{'›  '}</Text>
-              ) : (
-                <>
-                  <Text>{i + 1}. </Text>
-                </>
-              )}
-              {widget.name ? (
-                <>
-                  <Text bold>{widget.name}</Text> in <Text>{collapseHomedir(widget.cwd)}</Text>
-                </>
-              ) : (
-                <>
-                  <Text bold>{collapseHomedir(widget.cwd)}</Text>
-                </>
-              )}
-              <Text>: </Text>
-              <Text color={widget.status === 'idle' ? 'white' : widget.status === 'blocked' ? 'red' : 'green'}>
-                {widget.status}
+          <Box key={i} marginBottom={1} flexDirection="column">
+            <Box>
+              <Text>
+                {i === index ? (
+                  <Text
+                    bold
+                    color={widget.status === 'working' ? 'green' : widget.status === 'blocked' ? 'red' : undefined}
+                  >
+                    {'› '}
+                  </Text>
+                ) : widget.status === 'working' ? (
+                  <>
+                    <Text color="green">
+                      <Spinner />
+                    </Text>{' '}
+                  </>
+                ) : widget.status === 'blocked' ? (
+                  <Text color="red">{'? '}</Text>
+                ) : (
+                  <Text dimColor>{'  '}</Text>
+                )}
+                <Text bold color={widget.status === 'idle' ? undefined : widget.status === 'blocked' ? 'red' : 'green'}>
+                  {widget.name}
+                </Text>
               </Text>
-              {widget.lastUpdatedAt ? `, ${formatTimeAgo(widget.lastUpdatedAt, now)}` : ''}
-            </Text>
-            <Box flexDirection="column" backgroundColor="black" marginLeft={3}>
-              <WidgetPreview preview={widget.preview} expanded={i === index} />
+              <Spacer />
+              <Text dimColor> {collapseHomedir(widget.cwd)}</Text>
             </Box>
-            {!!textActionId && i === index && (
-              <Box marginTop={1}>
-                <Text>{'›  '}</Text>
-                <Box backgroundColor="black" flexGrow={1}>
-                  <TextInput value={text} onChange={setText} />
-                </Box>
-              </Box>
-            )}
+            <Box flexDirection="column" backgroundColor="black" marginLeft={2}>
+              <WidgetPreview preview={widget.preview} expanded={i === index && expanded} />
+            </Box>
           </Box>
         ))}
       </ScrollList>
@@ -380,44 +383,50 @@ const Dashboard: React.FC<{
         <Text dimColor>{scrollOffset < bottomOffset ? '▼ more' : ' '}</Text>
       </Box>
 
-      <Box ref={toolbarRef}>
-        <Box marginTop={1}>
-          {!!confirmActionId && (
-            <Box marginLeft={3}>
-              <Text>Confirm? (y/n)</Text>
-            </Box>
-          )}
+      <Box ref={toolbarRef} marginTop={1}>
+        {!!confirmActionId && (
+          <Box marginLeft={2}>
+            <Text>Confirm? (y/n)</Text>
+          </Box>
+        )}
 
-          {!!textActionId && (
-            <Box flexDirection="column">
-              <Box marginLeft={3}>
-                <Text dimColor>enter to submit · escape to cancel</Text>
+        {!!textActionId && (
+          <Box flexDirection="column" flexGrow={1} marginBottom={1}>
+            <Box>
+              <Text>{'› '}</Text>
+              <Box backgroundColor="black" flexGrow={1}>
+                <TextInput value={text} onChange={setText} />
               </Box>
             </Box>
-          )}
+            <Box marginLeft={2}>
+              <Text dimColor>enter to submit · escape to cancel</Text>
+            </Box>
+          </Box>
+        )}
 
-          {!textActionId && !confirmActionId && (
-            <Box flexDirection="column" marginLeft={3}>
-              {!!widget.actions && (
-                <Box>
-                  {widget.actions.map((action, i) => (
-                    <Text key={action.id} dimColor>
-                      {i > 0 ? ' · ' : ''}
-                      {action.keymaps[0] === ' '
-                        ? 'space'
-                        : action.keymaps[0].length === 1
-                          ? action.keymaps[0]
-                          : action.keymaps[0].toLowerCase()}{' '}
-                      to {action.name.toLowerCase()}
-                    </Text>
-                  ))}
-                </Box>
-              )}
+        {!textActionId && !confirmActionId && (
+          <Box flexDirection="column" marginLeft={2}>
+            {!!widget.actions && (
+              <Text dimColor wrap="truncate-end">
+                {widget.actions.map((action, i) => (
+                  <Fragment key={i}>
+                    {i > 0 ? ' · ' : ''}
+                    {action.keymaps[0] === ' '
+                      ? 'space'
+                      : action.keymaps[0].length === 1
+                        ? action.keymaps[0]
+                        : action.keymaps[0].toLowerCase()}{' '}
+                    to {action.name.toLowerCase()}
+                  </Fragment>
+                ))}
+              </Text>
+            )}
 
-              {!!widget.views && (
-                <Box>
+            {!!widget.views && (
+              <Box>
+                <Text dimColor wrap="truncate-end">
                   {widget.views.map((view, i) => (
-                    <Text key={view.id} dimColor>
+                    <Fragment key={i}>
                       {i > 0 ? ' · ' : ''}
                       {view.keymaps[0] === ' '
                         ? 'space'
@@ -425,13 +434,19 @@ const Dashboard: React.FC<{
                           ? view.keymaps[0]
                           : view.keymaps[0].toLowerCase()}{' '}
                       to view {view.name.toLowerCase()}
-                    </Text>
+                    </Fragment>
                   ))}
-                </Box>
-              )}
+                </Text>
+              </Box>
+            )}
+
+            <Box>
+              <Text dimColor wrap="truncate-end">
+                {expanded ? 'e to collapse' : 'e to expand'}
+              </Text>
             </Box>
-          )}
-        </Box>
+          </Box>
+        )}
       </Box>
     </Box>
   )
@@ -443,7 +458,7 @@ const WidgetPreview: FC<{
 }> = ({ preview, expanded }) => {
   let lines = (preview ?? '').split('\n').map(line => line.trimEnd())
 
-  const requiredLines = expanded ? 10 : 5
+  const requiredLines = expanded ? Math.min(Math.max(5, lines.length), 15) : 5
 
   let truncatedLines = 0
   let gapLines = Math.max(0, requiredLines - lines.length)
