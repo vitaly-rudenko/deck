@@ -101,10 +101,6 @@ export class TmuxProvider implements Provider {
       await execAsync(`tmux send-keys -t ${widgetId} Escape`)
     } else if (actionId === 'allow') {
       await execAsync(`tmux send-keys -t ${widgetId} Enter`)
-    } else if (actionId === 'kill') {
-      await execAsync(`tmux run-shell 'pkill -9 -P $(tmux display-message -t ${widgetId} -p "#{pane_pid}")'`).catch(
-        () => {},
-      )
     } else if (actionId === 'rename') {
       if (text) {
         await execAsync(`tmux set -p -t ${widgetId} @deck_widget_name "${text}"`)
