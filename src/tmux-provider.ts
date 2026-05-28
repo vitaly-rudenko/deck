@@ -268,10 +268,12 @@ async function queryPane(pid: number, paneId: string) {
           (line, i) => i < inputStartIndex && (line.trimStart().startsWith('⏺ ') || line.trimStart().startsWith('❯ ')),
         )
 
+        const brewedForIndex = lines.findLastIndex(
+          (line, i) => i > messageIndex && i < inputStartIndex && /^. [\w ]+ for [\d sm]+$/.test(line),
+        )
+
         previewStartIndex = messageIndex === -1 ? 0 : messageIndex
-        previewEndIndex = /^. [\w ]+ for [\d sm]+$/.test(lines[inputStartIndex - 2] ?? '') // ✻ Cogitated for 4s
-          ? inputStartIndex - 3
-          : inputStartIndex - 1
+        previewEndIndex = brewedForIndex !== -1 ? brewedForIndex - 1 : inputStartIndex - 1
         status = 'idle'
       }
     } catch (error) {
