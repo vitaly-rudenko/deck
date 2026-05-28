@@ -225,10 +225,18 @@ const Dashboard: React.FC<{
     setExpanded(expanded => expanded.filter(id => widgets?.some(widget => id === widget.id)))
   }, [widgets?.length])
 
-  useEffect(() => setOffsets({}), [index, expanded])
+  useEffect(() => {
+    setOffsets({})
+  }, [index, expanded])
 
   useEffect(() => {
-    if (!viewId) return
+    setConfirmActionId(actionId => (widget?.actions?.some(action => action.id === actionId) ? actionId : undefined))
+    setTextActionId(actionId => (widget?.actions?.some(action => action.id === actionId) ? actionId : undefined))
+    setViewId(viewId => (widget?.views?.some(view => view.id === viewId) ? viewId : undefined))
+  }, [widget?.actions, widget?.views])
+
+  useEffect(() => {
+    if (!widget || !viewId) return
 
     async function fetch() {
       setView(await getView(widget!.id, viewId!, columns))
@@ -375,14 +383,14 @@ const Dashboard: React.FC<{
             </Box>
             {!!confirmActionId && i === index ? (
               <Box>
-                <Text>
-                  › Confirm {widget.actions!.find(action => action.id === confirmActionId)!.name.toLowerCase()}?
-                </Text>
+                <Text bold>{'› '}</Text>
+                <Text>Confirm</Text>
+                <Text> {widget.actions?.find(action => action.id === confirmActionId)?.name.toLowerCase()}?</Text>
                 <Text dimColor> (y/n)</Text>
               </Box>
             ) : !!textActionId && i === index ? (
               <Box>
-                <Text>{'› '}</Text>
+                <Text bold>{'› '}</Text>
                 <Box flexGrow={1}>
                   <TextInput value={text} onChange={setText} />
                 </Box>
