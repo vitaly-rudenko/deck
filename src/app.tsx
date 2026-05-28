@@ -185,7 +185,7 @@ const Dashboard: React.FC<{
   const [bottomOffset, setBottomOffset] = useState(0)
   const [expanded, setExpanded] = useState(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (toolbarRef.current) {
       setToolbarHeight(measureElement(toolbarRef.current).height)
     }
