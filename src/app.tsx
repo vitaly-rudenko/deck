@@ -400,8 +400,8 @@ const Dashboard: React.FC<{
                   ) : widget.status === 'working' ? (
                     <>
                       <Text color="green">
-                        <Spinner />
-                      </Text>{' '}
+                        <Spinner />{' '}
+                      </Text>
                     </>
                   ) : widget.status === 'blocked' ? (
                     <Text color="red">{'? '}</Text>
