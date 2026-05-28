@@ -183,7 +183,8 @@ const Dashboard: React.FC<{
   const [view, setView] = useState<string>()
   const [scrollOffset, setScrollOffset] = useState(0)
   const [bottomOffset, setBottomOffset] = useState(0)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState<string[]>([])
+  const [offsets, setOffsets] = useState<Record<string, number>>({})
 
   useLayoutEffect(() => {
     if (toolbarRef.current) {
@@ -197,9 +198,9 @@ const Dashboard: React.FC<{
 
   useEffect(() => {
     const onResize = () => listRef.current?.remeasure()
-    stdout?.on('resize', onResize)
+    stdout.on('resize', onResize)
     return () => {
-      stdout?.off('resize', onResize)
+      stdout.off('resize', onResize)
     }
   }, [stdout])
 
@@ -221,7 +222,10 @@ const Dashboard: React.FC<{
 
   useEffect(() => {
     setIndex(index => Math.min(Math.max(0, index), widgets ? widgets.length - 1 : 0))
-  }, [widgets])
+    setExpanded(expanded => expanded.filter(id => widgets?.some(widget => id === widget.id)))
+  }, [widgets?.length])
+
+  useEffect(() => setOffsets({}), [index, expanded])
 
   useEffect(() => {
     if (!viewId) return
@@ -285,8 +289,26 @@ const Dashboard: React.FC<{
       setIndex(i => (i === widgets.length - 1 ? 0 : i + 1))
     } else if (input === 'q' || key.escape) {
       onExit()
+    } else if (input === 'u' && key.ctrl) {
+      const offsetAmount = expanded.includes(widget.id) ? 3 : 1
+
+      setOffsets(offsets => ({
+        ...offsets,
+        [widget.id]: (offsets[widget.id] ?? 0) + offsetAmount,
+      }))
+    } else if (input === 'd' && key.ctrl) {
+      const offsetAmount = expanded.includes(widget.id) ? 3 : 1
+
+      setOffsets(offsets => ({
+        ...offsets,
+        [widget.id]: Math.max(0, (offsets[widget.id] ?? 0) - offsetAmount),
+      }))
     } else if (input === 'e') {
-      setExpanded(!expanded)
+      if (expanded.includes(widget.id)) {
+        setExpanded(expanded.filter(id => id !== widget.id))
+      } else {
+        setExpanded([...expanded, widget.id])
+      }
     } else if (/^[1-9]$/.test(input)) {
       const targetIndex = Number(input) - 1
       if (targetIndex < widgets.length) {
@@ -345,7 +367,11 @@ const Dashboard: React.FC<{
         {widgets.map((widget, i) => (
           <Box key={i} marginBottom={1} flexDirection="column">
             <Box flexDirection="column" backgroundColor="black" marginLeft={2}>
-              <WidgetPreview preview={widget.preview} expanded={i === index && expanded} />
+              <WidgetPreview
+                preview={widget.preview ?? ''}
+                expanded={expanded.includes(widget.id)}
+                offset={offsets[widget.id] ?? 0}
+              />
             </Box>
             {!!confirmActionId && i === index ? (
               <Box>
@@ -416,7 +442,7 @@ const Dashboard: React.FC<{
                 </Fragment>
               ))}
               {' · '}
-              {expanded ? 'e to collapse' : 'e to expand'}
+              {expanded.includes(widget.id) ? 'e to collapse' : 'e to expand'}
             </Text>
           )}
 
@@ -444,38 +470,48 @@ const Dashboard: React.FC<{
 }
 
 const WidgetPreview: FC<{
-  preview?: string
-  expanded?: boolean
-}> = ({ preview, expanded }) => {
-  let lines = (preview ?? '').split('\n').map(line => line.trimEnd())
+  preview: string
+  expanded: boolean
+  offset: number
+}> = ({ preview, expanded, offset }) => {
+  const requiredLineCount = expanded ? 15 : 5
+  const lines: (string | undefined)[] = preview.split('\n').map(line => line.trimEnd())
 
-  const requiredLines = expanded ? Math.min(Math.max(5, lines.length), 15) : 5
-
-  let truncatedLines = 0
-  let gapLines = Math.max(0, requiredLines - lines.length)
-
-  if (lines.length > requiredLines) {
-    truncatedLines = lines.length - requiredLines + 1
-    lines = lines.slice(-requiredLines + 1)
+  // Pad to fill the required height
+  while (lines.length < requiredLineCount) {
+    lines.unshift(undefined)
   }
+
+  // Truncate lines at the end (offset)
+  const truncatedLinesEnd = []
+  while (offset > 0 && lines.length > requiredLineCount) {
+    truncatedLinesEnd.push(lines.pop())
+    offset--
+  }
+
+  // Truncate lines at the start (doesn't fit)
+  const truncatedLinesStart = []
+  while (lines.length > requiredLineCount) {
+    truncatedLinesStart.push(lines.shift())
+  }
+
+  // Leave room for ellipsis
+  if (truncatedLinesStart.length > 0) lines.shift()
+  // if (truncatedLinesEnd.length > 0) lines.pop()
 
   return (
     <Box flexDirection="column">
-      {truncatedLines > 0 && (
+      {truncatedLinesStart.length > 0 && (
         <>
           <Text dimColor wrap="truncate-end">
-            ({truncatedLines} more lines)
+            ({truncatedLinesStart.length} more lines)
           </Text>
         </>
       )}
-      {Array.from(new Array(gapLines), (_, i) => (
-        <Text key={i} dimColor>
-          ~
-        </Text>
-      ))}
       {lines.map((line, i) => (
-        <Text key={i} wrap="truncate-end">
-          {line.trimEnd() || ' '}
+        <Text key={i} wrap="truncate-end" dimColor={line === undefined}>
+          {line === undefined ? '~' : line || ' '}
+          {truncatedLinesEnd.length > 0 && i === lines.length - 1 && <Text dimColor>{'...'}</Text>}
         </Text>
       ))}
     </Box>
@@ -486,7 +522,7 @@ function matchKeymap(keymap: string, input: string, key: Key) {
   return (keymap === 'Enter' && key.return) || keymap === input
 }
 
-render(React.createElement(App), { alternateScreen: true })
+render(React.createElement(App), { alternateScreen: false })
 
 // Ensure the process always exits on signals, even if Ink's cleanup hangs.
 // SIGKILL is uncatchable and the OS restores terminal settings on exit.
