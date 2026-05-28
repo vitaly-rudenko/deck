@@ -175,7 +175,6 @@ const Dashboard: React.FC<{
   const toolbarRef = useRef<DOMElement>(null)
   const [toolbarHeight, setToolbarHeight] = useState(0)
 
-  const [now, setNow] = useState(() => Date.now())
   const [index, setIndex] = useState(0)
   const [text, setText] = useState('')
   const [textActionId, setTextActionId] = useState<string>()
@@ -221,9 +220,8 @@ const Dashboard: React.FC<{
   }, [])
 
   useEffect(() => {
-    const intervalId = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(intervalId)
-  }, [])
+    setIndex(index => Math.min(Math.max(0, index), widgets ? widgets.length - 1 : 0))
+  }, [widgets])
 
   useEffect(() => {
     if (!viewId) return

@@ -217,7 +217,7 @@ async function queryPane(pid: number, paneId: string) {
 
     const preview = normalizePreview(lines.slice(previewStartIndex, previewEndIndex + 1))
 
-    return { type: 'pi', signature: preview, preview, status } as const
+    return { type: 'pi', preview, status } as const
   } else if (type === 'claude_code') {
     let previewStartIndex = 0
     let previewEndIndex = Math.max(0, lines.length - 1)
@@ -283,7 +283,7 @@ async function queryPane(pid: number, paneId: string) {
 
     const preview = normalizePreview(lines.slice(previewStartIndex, previewEndIndex + 1))
 
-    return { type: 'claude_code', signature: preview, preview, status } as const
+    return { type: 'claude_code', preview, status } as const
   } else if (type === 'self') {
     return {
       type: 'self',
