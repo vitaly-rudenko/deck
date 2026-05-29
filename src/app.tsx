@@ -21,6 +21,7 @@ import type { Provider } from './provider.ts'
 import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
 import { ScrollList, ScrollListRef } from 'ink-scroll-list'
 import { ForegroundColorName } from 'chalk'
+import Spinner from 'ink-spinner'
 
 const terminalAppName = process.env.DECK_TERMINAL_APP_NAME
 const swiftbarPluginsDir = process.env.DECK_SWIFTBAR_PLUGINS_DIR
@@ -425,6 +426,7 @@ const Dashboard: React.FC<{
                 preview={widget.preview ?? ''}
                 height={heights[widget.id] ?? DEFAULT_HEIGHT}
                 offset={offsets[widget.id] ?? 0}
+                color={i !== index && widget.status === 'blocked' ? 'red' : undefined}
                 dimColor={i !== index}
               />
             </Box>
@@ -448,6 +450,17 @@ const Dashboard: React.FC<{
               ) : (
                 <>
                   <Text>
+                    {widget.status === 'working' && (
+                      <Text color={getWidgetColor(widget.type)}>
+                        <Spinner />{' '}
+                      </Text>
+                    )}
+                    {widget.status === 'blocked' && (
+                      <Text color={getWidgetColor(widget.type)}>
+                        <Spinner type="sand" />{' '}
+                      </Text>
+                    )}
+
                     <Text bold={i === index} color={getWidgetColor(widget.type)}>
                       {widget.name}
                     </Text>
@@ -516,8 +529,9 @@ const WidgetPreview: FC<{
   preview: string
   height: number
   offset: number
+  color?: ForegroundColorName
   dimColor?: boolean
-}> = ({ preview, height, offset, dimColor }) => {
+}> = ({ preview, height, offset, color, dimColor }) => {
   const lines: (string | undefined)[] = preview.split('\n').map(line => line.trimEnd())
 
   // Pad to fill the required height
@@ -541,7 +555,7 @@ const WidgetPreview: FC<{
   return (
     <Box flexDirection="column">
       {lines.map((line, i) => (
-        <Text key={i} wrap="truncate-end" dimColor={line === undefined || dimColor}>
+        <Text key={i} wrap="truncate-end" color={color} dimColor={line === undefined || dimColor}>
           {truncatedLinesStart.length > 0 && i === 0 && <Text dimColor>[+{truncatedLinesStart.length}] </Text>}
           {line || ' '}
           {truncatedLinesEnd.length > 0 && i === lines.length - 1 && (
