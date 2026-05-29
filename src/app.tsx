@@ -419,6 +419,7 @@ const Dashboard: React.FC<{
             borderStyle={i === index ? 'bold' : 'single'}
             borderColor={getWidgetColor(widget.type)}
             borderDimColor={i !== index}
+            marginX={1}
           >
             {/* Preview */}
             <Box flexDirection="column" marginX={1}>
@@ -483,7 +484,7 @@ const Dashboard: React.FC<{
       </Box>
 
       {/* Toolbar */}
-      <Box ref={toolbarRef} marginTop={1} marginLeft={2} flexDirection="column">
+      <Box ref={toolbarRef} marginTop={1} marginX={2} flexDirection="column">
         {/* Actions */}
         {!!widget.actions && (
           <Text dimColor wrap="truncate-end">
