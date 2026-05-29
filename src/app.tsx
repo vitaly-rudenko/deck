@@ -19,13 +19,16 @@ import { TmuxProvider } from './tmux-provider.ts'
 import type { Widget } from './widget.ts'
 import type { Provider } from './provider.ts'
 import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
-import Spinner from 'ink-spinner'
 import { ScrollList, ScrollListRef } from 'ink-scroll-list'
+import { ForegroundColorName } from 'chalk'
 
 const terminalAppName = process.env.DECK_TERMINAL_APP_NAME
 const swiftbarPluginsDir = process.env.DECK_SWIFTBAR_PLUGINS_DIR
 const port = process.env.DECK_SWIFTBAR_PORT ? Number(process.env.DECK_SWIFTBAR_PORT) : undefined
 const shortcut = process.env.DECK_SHORTCUT
+
+const HEIGHTS = [1, 5, 15]
+const DEFAULT_HEIGHT = 1
 
 const providers: Provider[] = [new TmuxProvider({ terminalAppName, shortcut })]
 
@@ -36,6 +39,14 @@ function formatWidgetType(type: string) {
   if (type === 'node') return 'node'
 
   return type
+}
+
+function getWidgetColor(type: string): ForegroundColorName | undefined {
+  if (type === 'pi') return 'green'
+  if (type === 'claude_code') return 'yellow'
+  if (type === 'node') return 'blue'
+
+  return undefined
 }
 
 const App: React.FC = () => {
@@ -329,15 +340,17 @@ const Dashboard: React.FC<{
         ...offsets,
         [widget.id]: Math.max(0, (offsets[widget.id] ?? 0) - offsetAmount),
       }))
-    } else if (input === 'e') {
-      const height = heights[widget.id] ?? 5
-
-      if (height === 5) {
-        setHeights(heights => ({ ...heights, [widget.id]: 15 }))
-      } else if (height === 15) {
-        setHeights(heights => ({ ...heights, [widget.id]: 1 }))
-      } else if (height === 1) {
-        setHeights(heights => ({ ...heights, [widget.id]: 5 }))
+    } else if (input === '{') {
+      const height = heights[widget.id] ?? DEFAULT_HEIGHT
+      const index = HEIGHTS.indexOf(height)
+      if (index > 0) {
+        setHeights(heights => ({ ...heights, [widget.id]: HEIGHTS[index - 1] }))
+      }
+    } else if (input === '}') {
+      const height = heights[widget.id] ?? DEFAULT_HEIGHT
+      const index = HEIGHTS.indexOf(height)
+      if (index < HEIGHTS.length - 1) {
+        setHeights(heights => ({ ...heights, [widget.id]: HEIGHTS[index + 1] }))
       }
     } else if (/^[1-9]$/.test(input)) {
       const targetIndex = Number(input) - 1
@@ -388,113 +401,112 @@ const Dashboard: React.FC<{
   }
 
   return (
-    <Box flexDirection="column" paddingRight={2} paddingBottom={1} maxWidth={100}>
+    <Box flexDirection="column">
       <Box justifyContent="center">
         <Text dimColor>{scrollOffset > 0 ? '▲ more' : ' '}</Text>
       </Box>
+
+      {/* Widget list */}
       <ScrollList ref={listRef} selectedIndex={index} height={rows - toolbarHeight - 4} onScroll={setScrollOffset}>
         {/* NOTE: Minimize dynamic height changes in list items, it makes the list flicker and jump */}
+
+        {/* Widget */}
         {widgets.map((widget, i) => (
-          <Box key={i} marginBottom={1} flexDirection="column">
-            <Box flexDirection="column" backgroundColor="black" marginLeft={2}>
+          <Box
+            key={i}
+            flexDirection="column"
+            borderStyle={i === index ? 'bold' : 'single'}
+            borderColor={getWidgetColor(widget.type)}
+            borderDimColor={i !== index}
+          >
+            {/* Preview */}
+            <Box flexDirection="column" marginX={1}>
               <WidgetPreview
                 preview={widget.preview ?? ''}
-                height={heights[widget.id] ?? 5}
+                height={heights[widget.id] ?? DEFAULT_HEIGHT}
                 offset={offsets[widget.id] ?? 0}
+                dimColor={i !== index}
               />
             </Box>
-            {!!confirmActionId && i === index ? (
-              <Box>
-                <Text bold>{'› '}</Text>
-                <Text>Confirm</Text>
-                <Text> {widget.actions?.find(action => action.id === confirmActionId)?.name.toLowerCase()}?</Text>
-                <Text dimColor> (y/n)</Text>
-              </Box>
-            ) : !!textActionId && i === index ? (
-              <Box>
-                <Text bold>{'› '}</Text>
-                <Box flexGrow={1}>
-                  <TextInput value={text} onChange={setText} />
-                </Box>
-              </Box>
-            ) : (
-              <Box>
-                <Text>
-                  {i === index ? (
-                    <Text
-                      bold
-                      color={widget.status === 'working' ? 'green' : widget.status === 'blocked' ? 'red' : undefined}
-                    >
-                      {'› '}
+
+            {/* Widget bar */}
+            <Box paddingX={1}>
+              {!!confirmActionId && i === index ? (
+                <>
+                  <Text bold>{'› '}</Text>
+                  <Text>Confirm</Text>
+                  <Text> {widget.actions?.find(action => action.id === confirmActionId)?.name.toLowerCase()}?</Text>
+                  <Text dimColor> (y/n)</Text>
+                </>
+              ) : !!textActionId && i === index ? (
+                <>
+                  <Text bold>{'› '}</Text>
+                  <Box flexGrow={1}>
+                    <TextInput value={text} onChange={setText} />
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <Text>
+                    <Text bold={i === index} color={getWidgetColor(widget.type)}>
+                      {widget.name}
                     </Text>
-                  ) : widget.status === 'working' ? (
-                    <>
-                      <Text color="green">
-                        <Spinner />{' '}
-                      </Text>
-                    </>
-                  ) : widget.status === 'blocked' ? (
-                    <Text color="red">{'? '}</Text>
-                  ) : (
-                    <Text dimColor>{'  '}</Text>
-                  )}
-                  <Text
-                    bold={i === index}
-                    color={widget.status === 'idle' ? undefined : widget.status === 'blocked' ? 'red' : 'green'}
-                  >
-                    {widget.name}
+                    <Text color={getWidgetColor(widget.type)} dimColor>
+                      {' '}
+                      {formatWidgetType(widget.type)}
+                    </Text>
                   </Text>
-                  <Text dimColor> ({formatWidgetType(widget.type)})</Text>
-                </Text>
-                <Spacer />
-                <Text dimColor>{collapseHomedir(widget.cwd)}</Text>
-              </Box>
-            )}
+                  <Spacer />
+                  <Text dimColor>{collapseHomedir(widget.cwd)}</Text>
+                </>
+              )}
+            </Box>
           </Box>
         ))}
       </ScrollList>
+
       <Box justifyContent="center">
         <Text dimColor>{scrollOffset < bottomOffset ? '▼ more' : ' '}</Text>
       </Box>
 
-      <Box ref={toolbarRef} marginTop={1}>
-        <Box flexDirection="column" marginLeft={2}>
-          {!!widget.actions && (
+      {/* Toolbar */}
+      <Box ref={toolbarRef} marginTop={1} marginLeft={2} flexDirection="column">
+        {/* Actions */}
+        {!!widget.actions && (
+          <Text dimColor wrap="truncate-end">
+            {widget.actions.map((action, i) => (
+              <Fragment key={i}>
+                {i > 0 ? ' · ' : ''}
+                {action.keymaps[0] === ' '
+                  ? 'space'
+                  : action.keymaps[0].length === 1
+                    ? action.keymaps[0]
+                    : action.keymaps[0].toLowerCase()}{' '}
+                to {action.name.toLowerCase()}
+              </Fragment>
+            ))}
+            {' · { } to change height'}
+          </Text>
+        )}
+
+        {/* Views */}
+        {!!widget.views && (
+          <Box>
             <Text dimColor wrap="truncate-end">
-              {widget.actions.map((action, i) => (
+              {widget.views.map((view, i) => (
                 <Fragment key={i}>
                   {i > 0 ? ' · ' : ''}
-                  {action.keymaps[0] === ' '
+                  {view.keymaps[0] === ' '
                     ? 'space'
-                    : action.keymaps[0].length === 1
-                      ? action.keymaps[0]
-                      : action.keymaps[0].toLowerCase()}{' '}
-                  to {action.name.toLowerCase()}
+                    : view.keymaps[0].length === 1
+                      ? view.keymaps[0]
+                      : view.keymaps[0].toLowerCase()}{' '}
+                  to view {view.name.toLowerCase()}
                 </Fragment>
               ))}
-              {' · '}
-              {'e to change height'}
             </Text>
-          )}
-
-          {!!widget.views && (
-            <Box>
-              <Text dimColor wrap="truncate-end">
-                {widget.views.map((view, i) => (
-                  <Fragment key={i}>
-                    {i > 0 ? ' · ' : ''}
-                    {view.keymaps[0] === ' '
-                      ? 'space'
-                      : view.keymaps[0].length === 1
-                        ? view.keymaps[0]
-                        : view.keymaps[0].toLowerCase()}{' '}
-                    to view {view.name.toLowerCase()}
-                  </Fragment>
-                ))}
-              </Text>
-            </Box>
-          )}
-        </Box>
+          </Box>
+        )}
       </Box>
     </Box>
   )
@@ -504,7 +516,8 @@ const WidgetPreview: FC<{
   preview: string
   height: number
   offset: number
-}> = ({ preview, height, offset }) => {
+  dimColor?: boolean
+}> = ({ preview, height, offset, dimColor }) => {
   const lines: (string | undefined)[] = preview.split('\n').map(line => line.trimEnd())
 
   // Pad to fill the required height
@@ -525,22 +538,15 @@ const WidgetPreview: FC<{
     truncatedLinesStart.push(lines.shift())
   }
 
-  // Leave room for ellipsis
-  if (height > 1 && truncatedLinesStart.length > 0) lines.shift()
-
   return (
     <Box flexDirection="column">
-      {height > 1 && truncatedLinesStart.length > 0 && (
-        <>
-          <Text dimColor wrap="truncate-end">
-            ({truncatedLinesStart.length} more lines)
-          </Text>
-        </>
-      )}
       {lines.map((line, i) => (
-        <Text key={i} wrap="truncate-end" dimColor={line === undefined}>
-          {line === undefined ? '~' : line || ' '}
-          {truncatedLinesEnd.length > 0 && i === lines.length - 1 && <Text dimColor>{'...'}</Text>}
+        <Text key={i} wrap="truncate-end" dimColor={line === undefined || dimColor}>
+          {truncatedLinesStart.length > 0 && i === 0 && <Text dimColor>[+{truncatedLinesStart.length}] </Text>}
+          {line || ' '}
+          {truncatedLinesEnd.length > 0 && i === lines.length - 1 && (
+            <Text dimColor> [+{truncatedLinesEnd.length}]</Text>
+          )}
         </Text>
       ))}
     </Box>
