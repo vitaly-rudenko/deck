@@ -49,7 +49,7 @@ export class TmuxProvider implements Provider {
         shortcut: query.type === 'self' ? this.#options.shortcut : undefined,
         actions: [
           { id: 'focus', name: 'Focus', keymaps: ['Enter', 'f'], default: true },
-          ...['pi', 'claude_code'].includes(query.type)
+          ...(['pi', 'claude_code'].includes(query.type)
             ? [
                 { id: 'prompt', name: 'Prompt', keymaps: [' ', 'p'], text: true },
                 ...(query.status === 'working'
@@ -58,7 +58,7 @@ export class TmuxProvider implements Provider {
                 ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
                 ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
               ]
-            : [],
+            : []),
           { id: 'rename', name: 'Rename', keymaps: ['r'], text: true },
         ],
         // TODO: Current permission state + Shift+Tab emulation
@@ -81,8 +81,12 @@ export class TmuxProvider implements Provider {
 
   async action(widgetId: string, actionId: string, text?: string): Promise<void> {
     if (actionId === 'focus') {
+      console.log('Focusing on ', widgetId, actionId)
+
       const displayMessageOutput = await execAsync(`tmux display-message -p -t ${widgetId} '#{window_index}'`)
       const windowIndex = Number(displayMessageOutput.stdout.trim())
+
+      console.log('Window index: ', windowIndex)
 
       await execAsync(`tmux select-window -t ${windowIndex}`)
       await setTimeoutAsync(100)
@@ -139,7 +143,6 @@ async function queryPane(pid: number, paneId: string) {
     if (/^pi(\s|$)/.test(process.command)) type = 'pi'
     if (/^claude(\s|$|-)/.test(process.command)) type = 'claude_code'
     if (process.parentPid === selfPid) type = 'self'
-
     if (['npm start', 'npm run '].some(pattern => process.command.startsWith(pattern))) {
       type = 'node'
     }
@@ -298,7 +301,7 @@ async function queryPane(pid: number, paneId: string) {
       type: 'node',
       preview: normalizePreview(lines),
       status: 'idle',
-    }
+    } as const
   } else {
     throw new Error(`Unknown type: ${type}`)
   }

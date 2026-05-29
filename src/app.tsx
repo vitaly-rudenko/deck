@@ -551,7 +551,7 @@ function matchKeymap(keymap: string, input: string, key: Key) {
   return (keymap === 'Enter' && key.return) || keymap === input
 }
 
-render(React.createElement(App), { alternateScreen: true, patchConsole: false })
+render(React.createElement(App), { alternateScreen: true, patchConsole: process.env.NODE_ENV !== 'dev' })
 
 // Ensure the process always exits on signals, even if Ink's cleanup hangs.
 // SIGKILL is uncatchable and the OS restores terminal settings on exit.
