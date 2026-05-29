@@ -29,6 +29,15 @@ const shortcut = process.env.DECK_SHORTCUT
 
 const providers: Provider[] = [new TmuxProvider({ terminalAppName, shortcut })]
 
+function formatWidgetType(type: string) {
+  if (type === 'pi') return 'pi'
+  if (type === 'claude_code') return 'claude code'
+  if (type === 'self') return 'deck'
+  if (type === 'node') return 'node'
+
+  return type
+}
+
 const App: React.FC = () => {
   const { exit } = useApp()
   const { stdout } = useStdout()
@@ -183,7 +192,7 @@ const Dashboard: React.FC<{
   const [view, setView] = useState<string>()
   const [scrollOffset, setScrollOffset] = useState(0)
   const [bottomOffset, setBottomOffset] = useState(0)
-  const [expanded, setExpanded] = useState<string[]>([])
+  const [heights, setHeights] = useState<Record<string, number>>({})
   const [offsets, setOffsets] = useState<Record<string, number>>({})
 
   useLayoutEffect(() => {
@@ -221,13 +230,22 @@ const Dashboard: React.FC<{
   }, [])
 
   useEffect(() => {
+    // Clamp index
     setIndex(index => Math.min(Math.max(0, index), widgets ? widgets.length - 1 : 0))
-    setExpanded(expanded => expanded.filter(id => widgets?.some(widget => id === widget.id)))
+
+    // Remove stale widgets
+    // TODO: I think we can combine heights and offsets into one object
+    setHeights(heights =>
+      Object.fromEntries(Object.entries(heights).filter(([id]) => widgets?.some(widget => id === widget.id))),
+    )
+    setOffsets(offsets =>
+      Object.fromEntries(Object.entries(offsets).filter(([id]) => widgets?.some(widget => id === widget.id))),
+    )
   }, [widgets?.length])
 
   useEffect(() => {
     setOffsets({})
-  }, [index, expanded])
+  }, [index, heights])
 
   useEffect(() => {
     setConfirmActionId(actionId => (widget?.actions?.some(action => action.id === actionId) ? actionId : undefined))
@@ -298,24 +316,28 @@ const Dashboard: React.FC<{
     } else if (input === 'q' || key.escape) {
       onExit()
     } else if (input === 'u' && key.ctrl) {
-      const offsetAmount = expanded.includes(widget.id) ? 3 : 1
+      const offsetAmount = heights[widget.id] && heights[widget.id] >= 10 ? 3 : 1
 
       setOffsets(offsets => ({
         ...offsets,
         [widget.id]: (offsets[widget.id] ?? 0) + offsetAmount,
       }))
     } else if (input === 'd' && key.ctrl) {
-      const offsetAmount = expanded.includes(widget.id) ? 3 : 1
+      const offsetAmount = heights[widget.id] && heights[widget.id] >= 10 ? 3 : 1
 
       setOffsets(offsets => ({
         ...offsets,
         [widget.id]: Math.max(0, (offsets[widget.id] ?? 0) - offsetAmount),
       }))
     } else if (input === 'e') {
-      if (expanded.includes(widget.id)) {
-        setExpanded(expanded.filter(id => id !== widget.id))
-      } else {
-        setExpanded([...expanded, widget.id])
+      const height = heights[widget.id] ?? 5
+
+      if (height === 5) {
+        setHeights(heights => ({ ...heights, [widget.id]: 15 }))
+      } else if (height === 15) {
+        setHeights(heights => ({ ...heights, [widget.id]: 1 }))
+      } else if (height === 1) {
+        setHeights(heights => ({ ...heights, [widget.id]: 5 }))
       }
     } else if (/^[1-9]$/.test(input)) {
       const targetIndex = Number(input) - 1
@@ -377,7 +399,7 @@ const Dashboard: React.FC<{
             <Box flexDirection="column" backgroundColor="black" marginLeft={2}>
               <WidgetPreview
                 preview={widget.preview ?? ''}
-                expanded={expanded.includes(widget.id)}
+                height={heights[widget.id] ?? 5}
                 offset={offsets[widget.id] ?? 0}
               />
             </Box>
@@ -417,14 +439,15 @@ const Dashboard: React.FC<{
                     <Text dimColor>{'  '}</Text>
                   )}
                   <Text
-                    bold
+                    bold={i === index}
                     color={widget.status === 'idle' ? undefined : widget.status === 'blocked' ? 'red' : 'green'}
                   >
                     {widget.name}
                   </Text>
+                  <Text dimColor> ({formatWidgetType(widget.type)})</Text>
                 </Text>
                 <Spacer />
-                <Text dimColor> {collapseHomedir(widget.cwd)}</Text>
+                <Text dimColor>{collapseHomedir(widget.cwd)}</Text>
               </Box>
             )}
           </Box>
@@ -450,7 +473,7 @@ const Dashboard: React.FC<{
                 </Fragment>
               ))}
               {' · '}
-              {expanded.includes(widget.id) ? 'e to collapse' : 'e to expand'}
+              {'e to change height'}
             </Text>
           )}
 
@@ -479,37 +502,35 @@ const Dashboard: React.FC<{
 
 const WidgetPreview: FC<{
   preview: string
-  expanded: boolean
+  height: number
   offset: number
-}> = ({ preview, expanded, offset }) => {
-  const requiredLineCount = expanded ? 15 : 5
+}> = ({ preview, height, offset }) => {
   const lines: (string | undefined)[] = preview.split('\n').map(line => line.trimEnd())
 
   // Pad to fill the required height
-  while (lines.length < requiredLineCount) {
+  while (lines.length < height) {
     lines.unshift(undefined)
   }
 
   // Truncate lines at the end (offset)
   const truncatedLinesEnd = []
-  while (offset > 0 && lines.length > requiredLineCount) {
+  while (offset > 0 && lines.length > height) {
     truncatedLinesEnd.push(lines.pop())
     offset--
   }
 
   // Truncate lines at the start (doesn't fit)
   const truncatedLinesStart = []
-  while (lines.length > requiredLineCount) {
+  while (lines.length > height) {
     truncatedLinesStart.push(lines.shift())
   }
 
   // Leave room for ellipsis
-  if (truncatedLinesStart.length > 0) lines.shift()
-  // if (truncatedLinesEnd.length > 0) lines.pop()
+  if (height > 1 && truncatedLinesStart.length > 0) lines.shift()
 
   return (
     <Box flexDirection="column">
-      {truncatedLinesStart.length > 0 && (
+      {height > 1 && truncatedLinesStart.length > 0 && (
         <>
           <Text dimColor wrap="truncate-end">
             ({truncatedLinesStart.length} more lines)
@@ -530,7 +551,7 @@ function matchKeymap(keymap: string, input: string, key: Key) {
   return (keymap === 'Enter' && key.return) || keymap === input
 }
 
-render(React.createElement(App), { alternateScreen: false })
+render(React.createElement(App), { alternateScreen: true, patchConsole: false })
 
 // Ensure the process always exits on signals, even if Ink's cleanup hangs.
 // SIGKILL is uncatchable and the OS restores terminal settings on exit.
