@@ -158,7 +158,7 @@ async function queryPane(pid: number, paneId: string) {
 
   const capturePaneOutput = await execAsync(`tmux capture-pane -t ${paneId} -S 0 -J -p`)
   const stdout = capturePaneOutput.stdout
-  const lines = stdout.split('\n')
+  const lines = stdout.split('\n').map(line => line.trimEnd())
 
   if (type === 'pi') {
     let previewStartIndex = 0
@@ -180,32 +180,47 @@ async function queryPane(pid: number, paneId: string) {
           throw new Error('Could not find title index')
         }
 
-        const allowIndex = lines.findIndex((line, i) => i > titleIndex && line.trimEnd().endsWith('Allow'))
+        const allowIndex = lines.findIndex((line, i) => i > titleIndex && line.endsWith('Allow'))
 
         previewStartIndex = titleIndex
         previewEndIndex = allowIndex === -1 ? titleIndex : allowIndex - 1
         status = 'blocked'
       } else if (stdout.includes('Working...')) {
-        const workingIndex = lines.findLastIndex(line => line.trimEnd().endsWith('Working...'))
+        const workingIndex = lines.findLastIndex(line => line.endsWith('Working...'))
         if (workingIndex === -1) {
           throw new Error('Could not find working index')
         }
 
-        const thinkingIndex = lines.findLastIndex((line, i) => i < workingIndex && line.trim() === 'Thinking...')
+        let encounteredNonThinking = false
+        const thinkingIndex = lines.findLastIndex((line, i) => {
+          if (i < workingIndex) {
+            const trimmed = line.trim()
+
+            if (trimmed === 'Thinking...' && encounteredNonThinking) {
+              return true
+            }
+
+            if (trimmed && trimmed !== 'Thinking...') {
+              encounteredNonThinking = true
+            }
+          }
+
+          return false
+        })
 
         previewStartIndex = thinkingIndex === -1 ? 0 : thinkingIndex + 1
         previewEndIndex = workingIndex - 1
         status = 'working'
       } else {
         const inputEndIndex = lines.findLastIndex(
-          line => line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+          line => line.trimStart().startsWith('─') && line.endsWith('─'),
         )
         if (inputEndIndex === -1) {
           throw new Error('Could not find input end index')
         }
 
         const inputStartIndex = lines.findLastIndex(
-          (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+          (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.endsWith('─'),
         )
         if (inputStartIndex === -1) {
           throw new Error('Could not find input start index')
@@ -238,7 +253,7 @@ async function queryPane(pid: number, paneId: string) {
           throw new Error('Could not find title index')
         }
 
-        const yesIndex = lines.findIndex((line, i) => i > titleIndex && line.trimEnd().endsWith('1. Yes'))
+        const yesIndex = lines.findIndex((line, i) => i > titleIndex && line.endsWith('1. Yes'))
 
         previewStartIndex = bashCommandIndex !== -1 ? bashCommandIndex + 1 : titleIndex
         previewEndIndex = yesIndex === -1 ? titleIndex : yesIndex - 1
@@ -258,14 +273,14 @@ async function queryPane(pid: number, paneId: string) {
         status = 'working'
       } else {
         const inputEndIndex = lines.findLastIndex(
-          line => line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+          line => line.trimStart().startsWith('─') && line.endsWith('─'),
         )
         if (inputEndIndex === -1) {
           throw new Error('Could not find input end index')
         }
 
         const inputStartIndex = lines.findLastIndex(
-          (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.trimEnd().endsWith('─'),
+          (line, i) => i < inputEndIndex && line.trimStart().startsWith('─') && line.endsWith('─'),
         )
         if (inputStartIndex === -1) {
           throw new Error('Could not find input start index')
