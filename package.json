@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "start": "tsx --env-file=.env src/app.tsx",
-    "dev": "tsx --watch --env-file=.env src/app.tsx",
+    "dev": "tsx --watch --env-file=.env --require ./src/init.ts src/app.tsx",
     "build": "esbuild src/app.tsx --bundle --platform=node --format=esm --jsx=automatic --packages=external --outfile=dist/index.js",
     "prepublishOnly": "npm run build"
   },
