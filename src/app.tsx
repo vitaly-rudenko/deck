@@ -427,7 +427,6 @@ const Dashboard: React.FC<{
                 preview={widget.preview ?? ''}
                 height={heights[widget.id] ?? DEFAULT_HEIGHT}
                 offset={offsets[widget.id] ?? 0}
-                color={i !== index && widget.status === 'blocked' ? 'red' : undefined}
                 dimColor={i !== index}
               />
             </Box>
@@ -457,7 +456,7 @@ const Dashboard: React.FC<{
                       </Text>
                     )}
                     {widget.status === 'blocked' && (
-                      <Text color={getWidgetColor(widget.type)}>
+                      <Text color="red">
                         <Spinner type="sand" />{' '}
                       </Text>
                     )}
@@ -530,9 +529,8 @@ const WidgetPreview: FC<{
   preview: string
   height: number
   offset: number
-  color?: ForegroundColorName
   dimColor?: boolean
-}> = ({ preview, height, offset, color, dimColor }) => {
+}> = ({ preview, height, offset, dimColor }) => {
   const lines: (string | undefined)[] = preview.split('\n').map(line => line.trimEnd())
 
   // Pad to fill the required height
@@ -556,7 +554,7 @@ const WidgetPreview: FC<{
   return (
     <Box flexDirection="column">
       {lines.map((line, i) => (
-        <Text key={i} wrap="truncate-end" color={color} dimColor={line === undefined || dimColor}>
+        <Text key={i} wrap="truncate-end" dimColor={line === undefined || dimColor}>
           {truncatedLinesStart.length > 0 && i === 0 && <Text dimColor>[+{truncatedLinesStart.length}] </Text>}
           {line || ' '}
           {truncatedLinesEnd.length > 0 && i === lines.length - 1 && (
