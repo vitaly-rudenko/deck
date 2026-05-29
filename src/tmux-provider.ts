@@ -49,12 +49,16 @@ export class TmuxProvider implements Provider {
         shortcut: query.type === 'self' ? this.#options.shortcut : undefined,
         actions: [
           { id: 'focus', name: 'Focus', keymaps: ['Enter', 'f'], default: true },
-          { id: 'prompt', name: 'Prompt', keymaps: [' ', 'p'], text: true },
-          ...(query.status === 'working'
-            ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }]
-            : []),
-          ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
-          ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
+          ...['pi', 'claude_code'].includes(query.type)
+            ? [
+                { id: 'prompt', name: 'Prompt', keymaps: [' ', 'p'], text: true },
+                ...(query.status === 'working'
+                  ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }]
+                  : []),
+                ...(query.status === 'blocked' ? [{ id: 'allow', name: 'Allow', keymaps: ['a'] }] : []),
+                ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
+              ]
+            : [],
           { id: 'rename', name: 'Rename', keymaps: ['r'], text: true },
         ],
         // TODO: Current permission state + Shift+Tab emulation
@@ -123,7 +127,7 @@ async function queryPane(pid: number, paneId: string) {
     }
   }
 
-  let type: 'pi' | 'claude_code' | 'self' | undefined
+  let type: 'pi' | 'claude_code' | 'self' | 'node' | undefined
 
   const selfPid = process.pid
   const queue = [pid]
@@ -135,6 +139,10 @@ async function queryPane(pid: number, paneId: string) {
     if (/^pi(\s|$)/.test(process.command)) type = 'pi'
     if (/^claude(\s|$|-)/.test(process.command)) type = 'claude_code'
     if (process.parentPid === selfPid) type = 'self'
+
+    if (['npm start', 'npm run '].some(pattern => process.command.startsWith(pattern))) {
+      type = 'node'
+    }
 
     for (const [childPid, processInfo] of processes) {
       if (processInfo.parentPid === currentPid) {
@@ -285,6 +293,12 @@ async function queryPane(pid: number, paneId: string) {
       type: 'self',
       status: 'idle',
     } as const
+  } else if (type === 'node') {
+    return {
+      type: 'node',
+      preview: normalizePreview(lines),
+      status: 'idle',
+    }
   } else {
     throw new Error(`Unknown type: ${type}`)
   }
