@@ -634,9 +634,26 @@ const Widgets: React.FC<{
 
             {/* Widget bar */}
             <Box paddingX={1}>
+              <Box flexShrink={0}>
+                {w.status === 'working' && (
+                  <Text color={w.color}>
+                    <Spinner />{' '}
+                  </Text>
+                )}
+                {w.status === 'blocked' && (
+                  <Text color="red">
+                    <Spinner type="sand" />{' '}
+                  </Text>
+                )}
+
+                <Text bold={w.id === widget.id} color={w.color}>
+                  {w.name}
+                </Text>
+              </Box>
+
               {!!action?.confirm && w.id === widget.id ? (
                 <>
-                  <Text bold>{'› '}</Text>
+                  <Text bold>{' › '}</Text>
                   <Text>Confirm</Text>
                   <Text> {action.name.toLowerCase()}?</Text>
                   <Text dimColor> (y/n)</Text>
@@ -644,7 +661,7 @@ const Widgets: React.FC<{
               ) : !!action?.text && w.id === widget.id ? (
                 <>
                   <Text color={w.color} bold>
-                    {'› '}
+                    {' › '}
                   </Text>
                   <Box flexGrow={1}>
                     <TextInput value={actionText} onChange={setActionText} />
@@ -653,20 +670,6 @@ const Widgets: React.FC<{
               ) : (
                 <>
                   <Box flexShrink={0}>
-                    {w.status === 'working' && (
-                      <Text color={w.color}>
-                        <Spinner />{' '}
-                      </Text>
-                    )}
-                    {w.status === 'blocked' && (
-                      <Text color="red">
-                        <Spinner type="sand" />{' '}
-                      </Text>
-                    )}
-
-                    <Text bold={w.id === widget.id} color={w.color}>
-                      {w.name}
-                    </Text>
                     <Text color={w.color} dimColor>
                       {' '}
                       {w.type}
