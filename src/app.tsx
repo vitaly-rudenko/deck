@@ -496,7 +496,9 @@ const Widgets: React.FC<{
     if (hidden) return
 
     if (!widget || !widgets) {
-      if (input === 'q' || key.escape) {
+      if (input === 'S') {
+        onSpawn()
+      } else if (input === 'q' || key.escape) {
         onExit()
       }
 
@@ -576,8 +578,14 @@ const Widgets: React.FC<{
 
   if (widgets.length === 0 || !widget) {
     return (
-      <Box paddingY={1} paddingX={2}>
-        <Text>No widgets yet</Text>
+      <Box flexDirection="column" height={rows}>
+        <Box paddingY={1} paddingX={2}>
+          <Text>No widgets yet</Text>
+        </Box>
+        <Spacer />
+        <Box paddingY={1} marginX={2}>
+          <Text dimColor>S to spawn · q to quit</Text>
+        </Box>
       </Box>
     )
   }
@@ -653,7 +661,9 @@ const Widgets: React.FC<{
 
               {!!action?.confirm && w.id === widget.id ? (
                 <>
-                  <Text color={w.color} bold>{' › '}</Text>
+                  <Text color={w.color} bold>
+                    {' › '}
+                  </Text>
                   <Text>Confirm</Text>
                   <Text> {action.name.toLowerCase()}?</Text>
                   <Text dimColor> (y/n)</Text>
