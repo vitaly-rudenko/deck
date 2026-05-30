@@ -7,18 +7,21 @@ export type Widget = {
   preview?: string
   shortcut?: string
 
-  views?: {
-    id: string
-    name: string
-    keymaps: string[]
-  }[]
+  views?: WidgetView[]
+  actions?: WidgetAction[]
+}
 
-  actions?: {
-    id: string
-    default?: boolean
-    name: string
-    keymaps: string[]
-    text?: boolean
-    confirm?: boolean
-  }[]
+export type WidgetAction = {
+  id: string
+  default?: boolean
+  name: string
+  keymaps: string[]
+  text?: boolean
+  confirm?: boolean
+}
+
+export type WidgetView = {
+  id: string
+  name: string
+  keymaps: string[]
 }
