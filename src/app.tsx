@@ -489,7 +489,7 @@ const Dashboard: React.FC<{
     }
 
     if (view) {
-      if (input === 'q' || key.escape || view.keymaps.some(keymap => matchKeymap(keymap, input, key))) {
+      if (input === 'q' || key.escape || matchKeymaps(view.keymaps, input, key)) {
         setViewId(undefined)
       }
 
@@ -513,11 +513,15 @@ const Dashboard: React.FC<{
     } else if (input === '}') {
       changeWidgetPreviewHeight(widget.id, 'expand')
     } else {
-      const view = widget.views?.find(v => v.keymaps.some(k => matchKeymap(k, input, key)))
+      const view = widget.views?.find(v => matchKeymaps(v.keymaps, input, key))
       setViewId(view?.id)
 
-      const action = widget.actions?.find(a => a.keymaps.some(k => matchKeymap(k, input, key)))
-      setActionId(action?.id)
+      const action = widget.actions?.find(a => matchKeymaps(a.keymaps, input, key))
+      if (action?.text || action?.confirm) {
+        setActionId(action.id)
+      } else if (action) {
+        onAction(widget.id, action.id)
+      }
     }
   })
 
@@ -723,8 +727,8 @@ const WidgetPreview: FC<{
   )
 }
 
-function matchKeymap(keymap: string, input: string, key: Key) {
-  return (keymap === 'Enter' && key.return) || keymap === input
+function matchKeymaps(keymaps: string[], input: string, key: Key) {
+  return keymaps.some(keymap => (keymap === 'Enter' && key.return) || keymap === input)
 }
 
 render(React.createElement(App), { alternateScreen: process.env.NODE_ENV !== 'dev' })
