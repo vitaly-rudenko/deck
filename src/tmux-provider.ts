@@ -10,6 +10,7 @@ const execAsync = promisify(exec)
 
 export class TmuxProvider implements Provider {
   #options
+  #latestWidgets: Widget[] = []
 
   constructor(options: { terminalAppName?: string; shortcut?: string }) {
     this.#options = options
@@ -59,6 +60,7 @@ export class TmuxProvider implements Provider {
                 ...(query.status === 'blocked' ? [{ id: 'deny', name: 'Deny', keymaps: ['d'] }] : []),
               ]
             : []),
+          { id: 'kill', name: 'Kill', keymaps: ['X'], confirm: true },
           { id: 'rename', name: 'Rename', keymaps: ['r'], text: true },
         ],
         // TODO: Current permission state + Shift+Tab emulation
@@ -66,7 +68,10 @@ export class TmuxProvider implements Provider {
     }
 
     // Stable sort
+    // TODO: Should happen on app layer?
     widgets.sort((a, b) => a.id.localeCompare(b.id))
+
+    this.#latestWidgets = widgets
 
     return widgets
   }
@@ -103,6 +108,19 @@ export class TmuxProvider implements Provider {
       }
     } else if (actionId === 'interrupt' || actionId === 'deny') {
       await execAsync(`tmux send-keys -t ${widgetId} Escape`)
+    } else if (actionId === 'kill') {
+      const widget = this.#latestWidgets.find(w => w.id === widgetId)
+      if (!widget) {
+        // TODO: warn
+      }
+
+      await execAsync(`tmux send-keys -t ${widgetId} C-c`)
+
+      // Agents require pressing Ctrl+C twice to exit
+      if (widget?.type === 'claude_code' || widget?.type === 'pi') {
+        await setTimeoutAsync(100)
+        await execAsync(`tmux send-keys -t ${widgetId} C-c`)
+      }
     } else if (actionId === 'allow') {
       await execAsync(`tmux send-keys -t ${widgetId} Enter`)
     } else if (actionId === 'rename') {
