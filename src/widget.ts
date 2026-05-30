@@ -7,6 +7,7 @@ export type Widget = {
   color: SupportedColor
   cwd: string
   status: 'idle' | 'working' | 'blocked'
+  statusline?: string
   preview?: string
   shortcut?: string
 

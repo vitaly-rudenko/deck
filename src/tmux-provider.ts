@@ -56,6 +56,7 @@ export class TmuxProvider implements Provider {
                 : 'cyan',
         cwd: pane.cwd,
         status: query.status,
+        statusline: query.statusline,
         preview: query.preview,
         views: [{ id: 'primary', name: 'Primary', keymaps: ['v', '?'] }],
         shortcut: query.type === 'self' ? this.#options.shortcut : undefined,
@@ -64,6 +65,7 @@ export class TmuxProvider implements Provider {
           ...(['pi', 'claude_code'].includes(query.type)
             ? [
                 { id: 'prompt', name: 'Prompt', keymaps: [' ', 'p'], text: true },
+                { id: 'toggle_permissions', name: 'Toggle permissions', keymaps: ['Shift+Tab'] },
                 ...(query.status === 'working'
                   ? [{ id: 'interrupt', name: 'Interrupt', keymaps: ['x'], confirm: true }]
                   : []),
@@ -140,6 +142,10 @@ export class TmuxProvider implements Provider {
       } else {
         await execAsync(`tmux set -pu -t ${widgetId} @deck_widget_name`)
       }
+    } else if (actionId === 'toggle_permissions') {
+      await execAsync(`tmux send-keys -t ${widgetId} BTab`)
+    } else {
+      throw new Error(`Unknown action: ${actionId}`)
     }
   }
 
@@ -306,7 +312,14 @@ async function queryPane(pid: number, paneId: string) {
 
     const preview = normalizePreview(lines.slice(previewStartIndex, previewEndIndex + 1))
 
-    return { type: 'pi', preview, status } as const
+    let statusline
+    if (stdout.includes('⏵⏵ accept edits on')) {
+      statusline = '⏵⏵ accept edits on'
+    } else if (stdout.includes('⏵⏵ bypass permissions')) {
+      statusline = '⏵⏵ bypass permissions'
+    }
+
+    return { type: 'pi', preview, status, statusline } as const
   } else if (type === 'claude_code') {
     let previewStartIndex = 0
     let previewEndIndex = Math.max(0, lines.length - 1)
@@ -370,7 +383,14 @@ async function queryPane(pid: number, paneId: string) {
 
     const preview = normalizePreview(lines.slice(previewStartIndex, previewEndIndex + 1))
 
-    return { type: 'claude_code', preview, status } as const
+    let statusline
+    if (stdout.includes('⏵⏵ accept edits on')) {
+      statusline = '⏵⏵ accept edits on'
+    } else if (stdout.includes('⏵⏵ bypass permissions')) {
+      statusline = '⏵⏵ bypass permissions'
+    }
+
+    return { type: 'claude_code', preview, status, statusline } as const
   } else if (type === 'self') {
     return {
       type: 'self',

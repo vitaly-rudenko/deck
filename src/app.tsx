@@ -643,7 +643,7 @@ const Widgets: React.FC<{
                 </>
               ) : (
                 <>
-                  <Text>
+                  <Box flexShrink={0}>
                     {w.status === 'working' && (
                       <Text color={w.color}>
                         <Spinner />{' '}
@@ -662,9 +662,21 @@ const Widgets: React.FC<{
                       {' '}
                       {w.type}
                     </Text>
-                  </Text>
+                  </Box>
+                  <Box flexShrink={1}>
+                    {w.statusline && (
+                      <Text dimColor wrap="truncate-end">
+                        {' '}
+                        {w.statusline}
+                      </Text>
+                    )}
+                  </Box>
                   <Spacer />
-                  <Text dimColor>{collapseHomedir(w.cwd)}</Text>
+                  <Box flexShrink={1}>
+                    <Text dimColor wrap="truncate-start">
+                      {collapseHomedir(w.cwd)}
+                    </Text>
+                  </Box>
                 </>
               )}
             </Box>
@@ -762,8 +774,14 @@ const WidgetPreview: FC<{
   )
 }
 
+// TODO: Proper matching
 function matchKeymaps(keymaps: string[], input: string, key: Key) {
-  return keymaps.some(keymap => (keymap === 'Enter' && key.return) || keymap === input)
+  return keymaps.some(
+    keymap =>
+      (keymap === 'Enter' && key.return) || //
+      (keymap === 'Shift+Tab' && key.shift && key.tab) ||
+      keymap === input,
+  )
 }
 
 render(React.createElement(App), { alternateScreen: process.env.NODE_ENV !== 'dev' })
