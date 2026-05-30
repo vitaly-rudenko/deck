@@ -1,7 +1,10 @@
+import type { SupportedColor } from './supported-color.ts'
+
 export type Widget = {
   id: string
   name: string
   type: string
+  color: SupportedColor
   cwd: string
   status: 'idle' | 'working' | 'blocked'
   preview?: string

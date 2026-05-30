@@ -46,6 +46,14 @@ export class TmuxProvider implements Provider {
         id: pane.paneId,
         name: pane.name || basename(pane.cwd),
         type: query.type,
+        color:
+          query.type === 'pi'
+            ? 'green'
+            : query.type === 'claude_code'
+              ? 'yellow'
+              : query.type === 'node'
+                ? 'blue'
+                : 'cyan',
         cwd: pane.cwd,
         status: query.status,
         preview: query.preview,
@@ -137,9 +145,20 @@ export class TmuxProvider implements Provider {
 
   async spawners(): Promise<Spawner[]> {
     return [
-      //
-      { id: 'claude_code', name: 'Claude Code', text: true },
-      { id: 'pi', name: 'Pi', text: true },
+      {
+        id: 'claude_code',
+        type: 'claude_code',
+        color: 'yellow',
+        name: 'Claude Code',
+        text: true,
+      },
+      {
+        id: 'pi',
+        type: 'pi',
+        color: 'green',
+        name: 'Pi',
+        text: true,
+      },
     ]
   }
 

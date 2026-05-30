@@ -21,7 +21,6 @@ import type { Provider } from './provider.ts'
 import type { Spawner } from './spawner.ts'
 import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
 import { ScrollList, ScrollListRef } from 'ink-scroll-list'
-import { ForegroundColorName } from 'chalk'
 import Spinner from 'ink-spinner'
 
 const terminalAppName = process.env.DECK_TERMINAL_APP_NAME
@@ -37,23 +36,6 @@ type WidgetState = {
 const WIDGET_PREVIEW_HEIGHTS = [1, 5, 15]
 const DEFAULT_WIDGET_PREVIEW_HEIGHT = 1
 const WIDGET_PREVIEW_SCROLL_PERCENTAGE = 0.5
-
-function formatWidgetType(type: string) {
-  if (type === 'pi') return 'pi'
-  if (type === 'claude_code') return 'claude code'
-  if (type === 'self') return 'deck'
-  if (type === 'node') return 'node'
-
-  return type
-}
-
-function getWidgetColor(type: string): ForegroundColorName | undefined {
-  if (type === 'pi') return 'green'
-  if (type === 'claude_code') return 'yellow'
-  if (type === 'node') return 'blue'
-
-  return undefined
-}
 
 function formatKeymaps(keymaps: string[]) {
   return keymaps[0] === ' ' //
@@ -282,39 +264,49 @@ const SpawnerPicker: React.FC<{
 
   return (
     <Box flexDirection="column">
-      <ScrollList selectedIndex={spawnerIndex} height={rows - 2} onScroll={() => {}}>
+      <ScrollList selectedIndex={spawnerIndex} height={rows - 3}>
+        <Box
+          marginTop={1}
+          marginX={1}
+          paddingX={1}
+          borderColor="blue"
+          borderRight={false}
+          borderTop={false}
+          borderBottom={false}
+          borderStyle="bold"
+        >
+          <Text color="blue">Provider: tmux</Text>
+        </Box>
+
         {spawners.map(s => (
           <Box
             key={s.id}
             flexDirection="column"
             borderStyle={s.id === spawners[spawnerIndex].id ? 'bold' : 'single'}
-            borderColor="green"
+            borderColor={s.color}
             borderDimColor={s.id !== spawners[spawnerIndex].id}
             marginX={1}
           >
             <Box paddingX={1}>
-              <Text bold={s.id === spawner.id} color="green">
+              <Text bold={s.id === spawner.id} color={s.color}>
                 {s.name}
               </Text>
-              {isSpawning && s.id === spawner.id ? (
+              {isSpawning && s.id === spawner.id && (
                 <>
-                  <Text bold>{' › '}</Text>
+                  <Text color={s.color} bold>
+                    {' › '}
+                  </Text>
                   <Box flexGrow={1}>
                     <TextInput value={spawningText} onChange={setSpawningText} />
                   </Box>
                 </>
-              ) : (
-                <Text color="green" dimColor>
-                  {' '}
-                  tmux
-                </Text>
               )}
             </Box>
           </Box>
         ))}
       </ScrollList>
 
-      <Box marginTop={1} marginX={2}>
+      <Box marginY={1} marginX={2}>
         <Text dimColor>enter to spawn · esc to cancel</Text>
       </Box>
     </Box>
@@ -576,7 +568,7 @@ const Dashboard: React.FC<{
             key={w.id}
             flexDirection="column"
             borderStyle={w.id === widget.id ? 'bold' : 'single'}
-            borderColor={getWidgetColor(w.type)}
+            borderColor={w.color}
             borderDimColor={w.id !== widget.id}
             marginX={1}
           >
@@ -601,7 +593,9 @@ const Dashboard: React.FC<{
                 </>
               ) : !!action?.text && w.id === widget.id ? (
                 <>
-                  <Text bold>{'› '}</Text>
+                  <Text color={w.color} bold>
+                    {'› '}
+                  </Text>
                   <Box flexGrow={1}>
                     <TextInput value={actionText} onChange={setActionText} />
                   </Box>
@@ -610,7 +604,7 @@ const Dashboard: React.FC<{
                 <>
                   <Text>
                     {w.status === 'working' && (
-                      <Text color={getWidgetColor(w.type)}>
+                      <Text color={w.color}>
                         <Spinner />{' '}
                       </Text>
                     )}
@@ -620,12 +614,12 @@ const Dashboard: React.FC<{
                       </Text>
                     )}
 
-                    <Text bold={w.id === widget.id} color={getWidgetColor(w.type)}>
+                    <Text bold={w.id === widget.id} color={w.color}>
                       {w.name}
                     </Text>
-                    <Text color={getWidgetColor(w.type)} dimColor>
+                    <Text color={w.color} dimColor>
                       {' '}
-                      {formatWidgetType(w.type)}
+                      {w.type}
                     </Text>
                   </Text>
                   <Spacer />
