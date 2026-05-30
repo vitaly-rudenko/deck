@@ -125,7 +125,6 @@ export class SwiftbarMenubar {
     let line = `${title} | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${url} terminal=false`
     if (item.shortcut) {
       line += ` shortcut=${item.shortcut}`
-      console.log(`Registered shortcut ${item.shortcut} on ${item.title}`)
     }
     lines.push(line)
 
