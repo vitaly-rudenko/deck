@@ -653,7 +653,7 @@ const Widgets: React.FC<{
 
               {!!action?.confirm && w.id === widget.id ? (
                 <>
-                  <Text bold>{' › '}</Text>
+                  <Text color={w.color} bold>{' › '}</Text>
                   <Text>Confirm</Text>
                   <Text> {action.name.toLowerCase()}?</Text>
                   <Text dimColor> (y/n)</Text>
