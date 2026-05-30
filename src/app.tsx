@@ -554,13 +554,23 @@ const WidgetPreview: FC<{
   return (
     <Box flexDirection="column">
       {lines.map((line, i) => (
-        <Text key={i} wrap="truncate-end" dimColor={line === undefined || dimColor}>
-          {truncatedLinesStart.length > 0 && i === 0 && <Text dimColor>[+{truncatedLinesStart.length}] </Text>}
-          {line || ' '}
-          {truncatedLinesEnd.length > 0 && i === lines.length - 1 && (
-            <Text dimColor> [+{truncatedLinesEnd.length}]</Text>
+        <Box key={i}>
+          <Box flexGrow={1} flexShrink={1}>
+            <Text dimColor={line === undefined || dimColor} wrap="truncate-end">
+              {line || ' '}
+            </Text>
+          </Box>
+          {truncatedLinesStart.length > 0 && i === 0 && (
+            <Box flexShrink={0}>
+              <Text dimColor> {truncatedLinesStart.length}↑</Text>
+            </Box>
           )}
-        </Text>
+          {truncatedLinesEnd.length > 0 && i === lines.length - 1 && (
+            <Box flexShrink={0}>
+              <Text dimColor> {truncatedLinesEnd.length}↓</Text>
+            </Box>
+          )}
+        </Box>
       ))}
     </Box>
   )
