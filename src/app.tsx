@@ -206,12 +206,43 @@ const SpawnerPicker: React.FC<{
   onBack: () => void
 }> = ({ spawners, onSpawn, onBack }) => {
   const { rows } = useWindowSize()
+  const { stdout } = useStdout()
+
+  const listRef = useRef<ScrollListRef>(null)
+  const toolbarRef = useRef<DOMElement>(null)
 
   const [spawnerIndex, setSpawnerIndex] = useState(0)
   const [spawningText, setSpawningText] = useState('')
   const [isSpawning, setIsSpawning] = useState(false)
 
+  const [toolbarHeight, setToolbarHeight] = useState(0)
+  const [spawnersListScroll, setSpawnersListScroll] = useState(0)
+  const [spawnersListBottomOffset, setSpawnersListBottomOffset] = useState(0)
+
   const spawner = useMemo(() => spawners?.[spawnerIndex], [spawners, spawnerIndex])
+
+  const canSpawnersListBeScrolledUp = useMemo(() => spawnersListScroll > 0, [spawnersListScroll])
+  const canSpawnersListBeScrolledDown = useMemo(
+    () => spawnersListScroll < spawnersListBottomOffset,
+    [spawnersListScroll, spawnersListBottomOffset],
+  )
+  const spawnersListHeight = useMemo(
+    () => rows - toolbarHeight - (canSpawnersListBeScrolledUp || canSpawnersListBeScrolledDown ? 4 : 2),
+    [rows, toolbarHeight, canSpawnersListBeScrolledUp, canSpawnersListBeScrolledDown],
+  )
+
+  useLayoutEffect(() => {
+    if (toolbarRef.current) setToolbarHeight(measureElement(toolbarRef.current).height)
+    if (listRef.current) setSpawnersListBottomOffset(listRef.current?.getBottomOffset() ?? 0)
+  }, [rows, spawnersListScroll])
+
+  useEffect(() => {
+    const onResize = () => listRef.current?.remeasure()
+    stdout.on('resize', onResize)
+    return () => {
+      stdout.off('resize', onResize)
+    }
+  }, [stdout])
 
   useInput((input, key) => {
     if (!spawners) return
@@ -264,20 +295,18 @@ const SpawnerPicker: React.FC<{
 
   return (
     <Box flexDirection="column">
-      <ScrollList selectedIndex={spawnerIndex} height={rows - 3}>
-        <Box
-          marginTop={1}
-          marginX={1}
-          paddingX={1}
-          borderColor="blue"
-          borderRight={false}
-          borderTop={false}
-          borderBottom={false}
-          borderStyle="bold"
-        >
-          <Text color="blue">Provider: tmux</Text>
+      {(canSpawnersListBeScrolledUp || canSpawnersListBeScrolledDown) && (
+        <Box justifyContent="center">
+          <Text dimColor>{canSpawnersListBeScrolledUp ? '▲ more' : ' '}</Text>
         </Box>
+      )}
 
+      <ScrollList
+        ref={listRef}
+        selectedIndex={spawnerIndex}
+        height={spawnersListHeight}
+        onScroll={setSpawnersListScroll}
+      >
         {spawners.map(s => (
           <Box
             key={s.id}
@@ -291,7 +320,7 @@ const SpawnerPicker: React.FC<{
               <Text bold={s.id === spawner.id} color={s.color}>
                 {s.name}
               </Text>
-              {isSpawning && s.id === spawner.id && (
+              {isSpawning && s.id === spawner.id ? (
                 <>
                   <Text color={s.color} bold>
                     {' › '}
@@ -300,13 +329,23 @@ const SpawnerPicker: React.FC<{
                     <TextInput value={spawningText} onChange={setSpawningText} />
                   </Box>
                 </>
+              ) : (
+                <Text color={s.color} dimColor>
+                  {' tmux'}
+                </Text>
               )}
             </Box>
           </Box>
         ))}
       </ScrollList>
 
-      <Box marginY={1} marginX={2}>
+      {(canSpawnersListBeScrolledUp || canSpawnersListBeScrolledDown) && (
+        <Box justifyContent="center">
+          <Text dimColor>{canSpawnersListBeScrolledDown ? '▼ more' : ' '}</Text>
+        </Box>
+      )}
+
+      <Box ref={toolbarRef} marginTop={1} marginX={2}>
         <Text dimColor>enter to spawn · esc to cancel</Text>
       </Box>
     </Box>
