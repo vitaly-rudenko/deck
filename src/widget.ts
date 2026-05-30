@@ -1,25 +1,30 @@
+import type { SupportedColor } from './supported-color.ts'
+
 export type Widget = {
   id: string
-  name?: string
+  name: string
   type: string
+  color: SupportedColor
   cwd: string
   status: 'idle' | 'working' | 'blocked'
-  lastUpdatedAt?: Date
   preview?: string
   shortcut?: string
 
-  views?: {
-    id: string
-    name: string
-    keymaps: string[]
-  }[]
+  views?: WidgetView[]
+  actions?: WidgetAction[]
+}
 
-  actions?: {
-    id: string
-    default?: boolean
-    name: string
-    keymaps: string[]
-    text?: boolean
-    confirm?: boolean
-  }[]
+export type WidgetAction = {
+  id: string
+  default?: boolean
+  name: string
+  keymaps: string[]
+  text?: boolean
+  confirm?: boolean
+}
+
+export type WidgetView = {
+  id: string
+  name: string
+  keymaps: string[]
 }
