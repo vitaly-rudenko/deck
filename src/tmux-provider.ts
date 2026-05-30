@@ -6,7 +6,7 @@ import type { Provider } from './provider'
 import type { Widget } from './widget'
 import { setTimeout as setTimeoutAsync } from 'node:timers/promises'
 import { basename } from 'node:path'
-import { homedir } from 'node:os'
+import { expandHomedir } from './utils/expand-homedir.ts'
 import { Spawner } from './spawner'
 
 const execAsync = promisify(exec)
@@ -385,10 +385,6 @@ async function queryPane(pid: number, paneId: string) {
   } else {
     throw new Error(`Unknown type: ${type}`)
   }
-}
-
-function expandHomedir(path: string) {
-  return path.replace(/^~/, homedir())
 }
 
 function normalizePreview(lines: string[]) {
