@@ -33,7 +33,7 @@ type WidgetState = {
   previewHeight: number
 }
 
-const WIDGET_PREVIEW_HEIGHTS = [1, 5, 15]
+const WIDGET_PREVIEW_HEIGHTS = [0, 1, 5, 15]
 const DEFAULT_WIDGET_PREVIEW_HEIGHT = 1
 const WIDGET_PREVIEW_SCROLL_PERCENTAGE = 0.5
 
@@ -612,14 +612,16 @@ const Widgets: React.FC<{
             marginX={1}
           >
             {/* Preview */}
-            <Box flexDirection="column" marginX={1}>
-              <WidgetPreview
-                preview={w.preview ?? ''}
-                height={getWidgetState(w.id).previewHeight}
-                scroll={getWidgetState(w.id).previewScroll}
-                dimColor={w.id !== widget.id}
-              />
-            </Box>
+            {getWidgetState(w.id).previewHeight > 0 && (
+              <Box flexDirection="column" marginX={1}>
+                <WidgetPreview
+                  preview={w.preview ?? ''}
+                  height={getWidgetState(w.id).previewHeight}
+                  scroll={getWidgetState(w.id).previewScroll}
+                  dimColor={w.id !== widget.id}
+                />
+              </Box>
+            )}
 
             {/* Widget bar */}
             <Box paddingX={1}>
