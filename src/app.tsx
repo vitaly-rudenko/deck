@@ -86,21 +86,20 @@ const App: React.FC = () => {
   return (
     <>
       {/* TODO: Un-hardcode provider */}
-      {mode === 'spawner' ? (
-        <Spawners
-          spawners={spawners}
-          onSpawn={async (spawnerId, text) => providers[0].spawn(spawnerId, text)}
-          onBack={() => setMode('dashboard')}
-        />
-      ) : (
-        <Widgets
-          widgets={widgets?.filter(widget => widget.type !== 'self')}
-          fetchViewPreview={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
-          onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
-          onSpawn={() => setMode('spawner')}
-          onExit={() => exit()}
-        />
-      )}
+      <Widgets
+        hidden={mode !== 'dashboard'}
+        widgets={widgets?.filter(widget => widget.type !== 'self')}
+        fetchViewPreview={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
+        onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
+        onSpawn={() => setMode('spawner')}
+        onExit={() => exit()}
+      />
+      <Spawners
+        hidden={mode !== 'spawner'}
+        spawners={spawners}
+        onSpawn={async (spawnerId, text) => providers[0].spawn(spawnerId, text)}
+        onBack={() => setMode('dashboard')}
+      />
 
       {!!swiftbarPluginsDir && port !== undefined && (
         <Swiftbar
@@ -201,10 +200,11 @@ const Swiftbar: React.FC<{
 }
 
 const Spawners: React.FC<{
+  hidden?: boolean
   spawners: Spawner[] | undefined
   onSpawn: (spawnerId: string, text?: string) => Promise<void>
   onBack: () => void
-}> = ({ spawners, onSpawn, onBack }) => {
+}> = ({ hidden, spawners, onSpawn, onBack }) => {
   const { rows } = useWindowSize()
   const { stdout } = useStdout()
 
@@ -234,7 +234,7 @@ const Spawners: React.FC<{
   useLayoutEffect(() => {
     if (toolbarRef.current) setToolbarHeight(measureElement(toolbarRef.current).height)
     if (listRef.current) setSpawnersListBottomOffset(listRef.current?.getBottomOffset() ?? 0)
-  }, [rows, spawnersListScroll])
+  }, [rows, spawnersListScroll, hidden])
 
   useEffect(() => {
     const onResize = () => listRef.current?.remeasure()
@@ -242,9 +242,11 @@ const Spawners: React.FC<{
     return () => {
       stdout.off('resize', onResize)
     }
-  }, [stdout])
+  }, [stdout, hidden])
 
   useInput((input, key) => {
+    if (hidden) return
+
     if (!spawners) return
 
     if (spawner && isSpawning) {
@@ -272,10 +274,12 @@ const Spawners: React.FC<{
         onSpawn(spawner.id)
         onBack()
       }
-    } else if (key.escape) {
+    } else if (key.escape || input === 'S') {
       onBack()
     }
   })
+
+  if (hidden) return null
 
   if (!spawners) {
     return (
@@ -353,12 +357,13 @@ const Spawners: React.FC<{
 }
 
 const Widgets: React.FC<{
+  hidden?: boolean
   widgets: Widget[] | undefined
   fetchViewPreview: (widgetId: string, viewId: string, height: number) => Promise<string>
   onAction: (widgetId: string, actionId: string, text?: string) => Promise<void>
   onSpawn: () => void
   onExit: () => void
-}> = ({ widgets, fetchViewPreview, onAction, onSpawn, onExit }) => {
+}> = ({ hidden, widgets, fetchViewPreview, onAction, onSpawn, onExit }) => {
   // EXTERNAL
   const { stdout } = useStdout()
   const { rows, columns } = useWindowSize()
@@ -441,7 +446,7 @@ const Widgets: React.FC<{
     // Track size of toolbar and widgets list
     if (toolbarRef.current) setToolbarHeight(measureElement(toolbarRef.current).height)
     if (listRef.current) setWidgetsListBottomOffset(listRef.current?.getBottomOffset() ?? 0)
-  }, [rows, widgetsListScroll, widgetStates])
+  }, [rows, widgetsListScroll, widgetStates, hidden])
 
   useEffect(() => {
     // Re-measure widgets list on resize
@@ -450,7 +455,7 @@ const Widgets: React.FC<{
     return () => {
       stdout.off('resize', onResize)
     }
-  }, [stdout])
+  }, [stdout, hidden])
 
   useEffect(() => {
     // Clamp widget index
@@ -488,6 +493,8 @@ const Widgets: React.FC<{
   }, [widget, viewId])
 
   useInput((input, key) => {
+    if (hidden) return
+
     if (!widget || !widgets) {
       if (input === 'q' || key.escape) {
         onExit()
@@ -557,6 +564,8 @@ const Widgets: React.FC<{
   })
 
   // VIEW
+  if (hidden) return null
+
   if (!widgets) {
     return (
       <Box paddingY={1} paddingX={2}>
@@ -694,7 +703,7 @@ const Widgets: React.FC<{
       <Box ref={toolbarRef} marginTop={1} marginX={2} flexDirection="column">
         {/* Actions */}
         {!!widget.actions && (
-          <Text dimColor wrap="truncate-end">
+          <Text dimColor>
             {widget.actions.map((a, i) => (
               <Fragment key={a.id}>
                 {i > 0 ? ' · ' : ''}
