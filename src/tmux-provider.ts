@@ -1,10 +1,13 @@
 import { exec } from 'node:child_process'
+import { stat } from 'node:fs/promises'
 import { promisify } from 'node:util'
 
 import type { Provider } from './provider'
 import type { Widget } from './widget'
 import { setTimeout as setTimeoutAsync } from 'node:timers/promises'
 import { basename } from 'node:path'
+import { homedir } from 'node:os'
+import { Spawner } from './spawner'
 
 const execAsync = promisify(exec)
 
@@ -129,6 +132,38 @@ export class TmuxProvider implements Provider {
       } else {
         await execAsync(`tmux set -pu -t ${widgetId} @deck_widget_name`)
       }
+    }
+  }
+
+  async spawners(): Promise<Spawner[]> {
+    return [
+      //
+      { id: 'claude_code', name: 'Claude Code', text: true },
+      { id: 'pi', name: 'Pi', text: true },
+    ]
+  }
+
+  async spawn(spawnerId: string, text?: string): Promise<void> {
+    if (spawnerId === 'claude_code') {
+      if (!text) return
+
+      const cwd = expandHomedir(text)
+      const cwdStat = await stat(cwd).catch(() => false)
+      if (!cwdStat) return
+
+      const { stdout: paneId } = await execAsync(`tmux new-window -t home: -c '${cwd}' -d -P -F '#{pane_id}'`)
+      await execAsync(`tmux send-keys -t ${paneId.trim()} c Enter`)
+    } else if (spawnerId === 'pi') {
+      if (!text) return
+
+      const cwd = expandHomedir(text)
+      const cwdStat = await stat(cwd).catch(() => false)
+      if (!cwdStat) return
+
+      const { stdout: paneId } = await execAsync(`tmux new-window -t home: -c '${cwd}' -d -P -F '#{pane_id}'`)
+      await execAsync(`tmux send-keys -t ${paneId.trim()} p Enter`)
+    } else {
+      throw new Error(`Unknown spawner: ${spawnerId}`)
     }
   }
 }
@@ -331,6 +366,10 @@ async function queryPane(pid: number, paneId: string) {
   } else {
     throw new Error(`Unknown type: ${type}`)
   }
+}
+
+function expandHomedir(path: string) {
+  return path.replace(/^~/, homedir())
 }
 
 function normalizePreview(lines: string[]) {

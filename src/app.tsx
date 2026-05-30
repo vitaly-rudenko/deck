@@ -18,6 +18,7 @@ import { collapseHomedir } from './utils/collapse-homedir.ts'
 import { TmuxProvider } from './tmux-provider.ts'
 import type { Widget } from './widget.ts'
 import type { Provider } from './provider.ts'
+import type { Spawner } from './spawner.ts'
 import { SwiftbarMenubar } from './integrations/swiftbar-menubar.ts'
 import { ScrollList, ScrollListRef } from 'ink-scroll-list'
 import { ForegroundColorName } from 'chalk'
@@ -71,7 +72,10 @@ const providers: Provider[] = [new TmuxProvider({ terminalAppName, shortcut })]
 const App: React.FC = () => {
   const { exit } = useApp()
   const { stdout } = useStdout()
+
   const [widgets, setWidgets] = useState<Widget[]>()
+  const [spawners, setSpawners] = useState<Spawner[]>()
+  const [mode, setMode] = useState<'dashboard' | 'spawner'>('dashboard')
 
   useLayoutEffect(() => {
     stdout.write('\x1b[2J\x1b[H') // Resets the cursor to the top left corner
@@ -80,12 +84,15 @@ const App: React.FC = () => {
   useEffect(() => {
     async function fetch() {
       const newWidgets: Widget[] = []
+      const newSpawners: Spawner[] = []
 
       for (const provider of providers) {
         newWidgets.push(...(await provider.poll()))
+        newSpawners.push(...(await provider.spawners()))
       }
 
       setWidgets(newWidgets)
+      setSpawners(newSpawners)
     }
 
     const intervalId = setInterval(fetch, 1000)
@@ -96,13 +103,22 @@ const App: React.FC = () => {
 
   return (
     <>
-      <Dashboard
-        widgets={widgets?.filter(widget => widget.type !== 'self')}
-        // TODO: which provider?
-        fetchViewPreview={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
-        onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
-        onExit={() => exit()}
-      />
+      {/* TODO: Un-hardcode provider */}
+      {mode === 'spawner' ? (
+        <SpawnerPicker
+          spawners={spawners}
+          onSpawn={async (spawnerId, text) => providers[0].spawn(spawnerId, text)}
+          onBack={() => setMode('dashboard')}
+        />
+      ) : (
+        <Dashboard
+          widgets={widgets?.filter(widget => widget.type !== 'self')}
+          fetchViewPreview={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
+          onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
+          onSpawn={() => setMode('spawner')}
+          onExit={() => exit()}
+        />
+      )}
 
       {!!swiftbarPluginsDir && port !== undefined && (
         <SwiftbarMenubarComponent
@@ -202,12 +218,116 @@ const SwiftbarMenubarComponent: React.FC<{
   return null
 }
 
+const SpawnerPicker: React.FC<{
+  spawners: Spawner[] | undefined
+  onSpawn: (spawnerId: string, text?: string) => Promise<void>
+  onBack: () => void
+}> = ({ spawners, onSpawn, onBack }) => {
+  const { rows } = useWindowSize()
+
+  const [spawnerIndex, setSpawnerIndex] = useState(0)
+  const [spawningText, setSpawningText] = useState('')
+  const [isSpawning, setIsSpawning] = useState(false)
+
+  const spawner = useMemo(() => spawners?.[spawnerIndex], [spawners, spawnerIndex])
+
+  useInput((input, key) => {
+    if (!spawners) return
+
+    if (spawner && isSpawning) {
+      if (key.return) {
+        onSpawn(spawner.id, spawningText)
+        onBack()
+      } else if (key.escape) {
+        setSpawningText('')
+        setIsSpawning(false)
+      }
+
+      return
+    }
+
+    if (input === 'k' || key.upArrow) {
+      setSpawnerIndex(i => (i === 0 ? spawners.length - 1 : i - 1))
+    } else if (input === 'j' || key.downArrow) {
+      setSpawnerIndex(i => (i === spawners.length - 1 ? 0 : i + 1))
+    } else if (key.return || input === ' ') {
+      const spawner = spawners[spawnerIndex]
+
+      if (spawner.text) {
+        setIsSpawning(true)
+      } else if (key.return) {
+        onSpawn(spawner.id)
+        onBack()
+      }
+    } else if (key.escape) {
+      onBack()
+    }
+  })
+
+  if (!spawners) {
+    return (
+      <Box paddingY={1} paddingX={2}>
+        <Text>Loading spawners...</Text>
+      </Box>
+    )
+  }
+
+  if (spawners.length === 0 || !spawner) {
+    return (
+      <Box paddingY={1} paddingX={2}>
+        <Text>No spawners available</Text>
+      </Box>
+    )
+  }
+
+  return (
+    <Box flexDirection="column">
+      <ScrollList selectedIndex={spawnerIndex} height={rows - 2} onScroll={() => {}}>
+        {spawners.map(s => (
+          <Box
+            key={s.id}
+            flexDirection="column"
+            borderStyle={s.id === spawners[spawnerIndex].id ? 'bold' : 'single'}
+            borderColor="green"
+            borderDimColor={s.id !== spawners[spawnerIndex].id}
+            marginX={1}
+          >
+            <Box paddingX={1}>
+              <Text bold={s.id === spawner.id} color="green">
+                {s.name}
+              </Text>
+              {isSpawning && s.id === spawner.id ? (
+                <>
+                  <Text bold>{' › '}</Text>
+                  <Box flexGrow={1}>
+                    <TextInput value={spawningText} onChange={setSpawningText} />
+                  </Box>
+                </>
+              ) : (
+                <Text color="green" dimColor>
+                  {' '}
+                  tmux
+                </Text>
+              )}
+            </Box>
+          </Box>
+        ))}
+      </ScrollList>
+
+      <Box marginTop={1} marginX={2}>
+        <Text dimColor>enter to spawn · esc to cancel</Text>
+      </Box>
+    </Box>
+  )
+}
+
 const Dashboard: React.FC<{
   widgets: Widget[] | undefined
   fetchViewPreview: (widgetId: string, viewId: string, height: number) => Promise<string>
   onAction: (widgetId: string, actionId: string, text?: string) => Promise<void>
+  onSpawn: () => void
   onExit: () => void
-}> = ({ widgets, fetchViewPreview, onAction, onExit }) => {
+}> = ({ widgets, fetchViewPreview, onAction, onSpawn, onExit }) => {
   // EXTERNAL
   const { stdout } = useStdout()
   const { rows, columns } = useWindowSize()
@@ -380,6 +500,8 @@ const Dashboard: React.FC<{
       setWidgetIndex(i => (i === 0 ? widgets.length - 1 : i - 1))
     } else if (input === 'j' || key.downArrow) {
       setWidgetIndex(i => (i === widgets.length - 1 ? 0 : i + 1))
+    } else if (input === 'S') {
+      onSpawn()
     } else if (input === 'q' || key.escape) {
       onExit()
     } else if (input === 'u' && key.ctrl) {
@@ -528,7 +650,7 @@ const Dashboard: React.FC<{
                 {formatKeymaps(a.keymaps)} to {a.name.toLowerCase()}
               </Fragment>
             ))}
-            {' · { } to change height'}
+            {' · { } to change height · S to spawn'}
           </Text>
         )}
 
