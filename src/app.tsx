@@ -87,13 +87,13 @@ const App: React.FC = () => {
     <>
       {/* TODO: Un-hardcode provider */}
       {mode === 'spawner' ? (
-        <SpawnerPicker
+        <Spawners
           spawners={spawners}
           onSpawn={async (spawnerId, text) => providers[0].spawn(spawnerId, text)}
           onBack={() => setMode('dashboard')}
         />
       ) : (
-        <Dashboard
+        <Widgets
           widgets={widgets?.filter(widget => widget.type !== 'self')}
           fetchViewPreview={async (widgetId, viewId, height) => providers[0].view(widgetId, viewId, height)}
           onAction={async (widgetId, actionId, text) => providers[0].action(widgetId, actionId, text)}
@@ -103,7 +103,7 @@ const App: React.FC = () => {
       )}
 
       {!!swiftbarPluginsDir && port !== undefined && (
-        <SwiftbarMenubarComponent
+        <Swiftbar
           swiftbarPluginsDir={swiftbarPluginsDir}
           port={port}
           widgets={widgets}
@@ -114,7 +114,7 @@ const App: React.FC = () => {
   )
 }
 
-const SwiftbarMenubarComponent: React.FC<{
+const Swiftbar: React.FC<{
   swiftbarPluginsDir: string
   port: number
   widgets: Widget[] | undefined
@@ -200,7 +200,7 @@ const SwiftbarMenubarComponent: React.FC<{
   return null
 }
 
-const SpawnerPicker: React.FC<{
+const Spawners: React.FC<{
   spawners: Spawner[] | undefined
   onSpawn: (spawnerId: string, text?: string) => Promise<void>
   onBack: () => void
@@ -352,7 +352,7 @@ const SpawnerPicker: React.FC<{
   )
 }
 
-const Dashboard: React.FC<{
+const Widgets: React.FC<{
   widgets: Widget[] | undefined
   fetchViewPreview: (widgetId: string, viewId: string, height: number) => Promise<string>
   onAction: (widgetId: string, actionId: string, text?: string) => Promise<void>
